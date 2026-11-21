@@ -48,7 +48,7 @@ DEFAULT_ACCOUNTS = [
     ("522", "عمولات بيعية وتسويق عقاري", "مصروفات", 32, 1),
     ("523", "إيجارات ومرافق وخدمات", "مصروفات", 32, 1),
     ("524", "رسوم تراخيص واستشارات هندسية", "مصروفات", 32, 1)
-def make_hashes(password):
+]def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def check_hashes(password, hashed_text):
