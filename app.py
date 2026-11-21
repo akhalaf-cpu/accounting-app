@@ -140,14 +140,24 @@ def init_db():
                 balance REAL DEFAULT 0.0
             )
         '''))
+      conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL
+            )
+        '''))
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_entries (
                 id SERIAL PRIMARY KEY,
                 entry_date TEXT NOT NULL,
-                description TEXT
+                description TEXT,
+                project_name TEXT DEFAULT 'عام / الإدارة'
             )
         '''))
-        conn.execute(text('''
+        conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
+        proj_count = conn.execute(text("SELECT COUNT(*) FROM projects")).scalar()
+        if proj_count == 0:
+            conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))        conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_details (
                 id SERIAL PRIMARY KEY,
                 entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
@@ -232,6 +242,7 @@ else:
         "📑 كشف حساب",
         "📈 قائمة الدخل",
         "🏛️ الميزانية العمومية"
+        "🏗️ المشاريع ومراكز التكلفة"
     ]
     
     if st.session_state['user_role'] == "مدير النظام":
@@ -418,9 +429,16 @@ else:
                 status_str = "✅ متاح" if row['allow_posting'] == 1 else "❌ ممنوع التسجيل"
                 acc_dict[f"{row['code']} - {row['name']} ({status_str})"] = (int(row['id']), int(row['allow_posting']))
 
-            entry_date = st.date_input("تاريخ القيد", value=date.today())
-            description = st.text_input("البيان / شرح القيد")
+            projects_df = pd.read_sql("SELECT name FROM projects ORDER BY id ASC", engine)
+            projects_list = projects_df['name'].tolist() if not projects_df.empty else ["عام / الإدارة"]
             
+            col_top1, col_top2 = st.columns(2)
+            with col_top1:
+                entry_date = st.date_input("تاريخ القيد", value=date.today())
+            with col_top2:
+                selected_project = st.selectbox("🏗️ المشروع / مركز التكلفة", projects_list)
+                
+            description = st.text_input("البيان / شرح القيد")
             col_m1, col_m2 = st.columns(2)
             with col_m1:
                 debit_acc = st.selectbox("حساب المدين", list(acc_dict.keys()), key="deb_acc")
@@ -446,8 +464,9 @@ else:
                 else:
                     with engine.begin() as conn:
                         entry_id = conn.execute(
-                            text("INSERT INTO journal_entries (entry_date, description) VALUES (:d, :desc) RETURNING id"),
-                            {"d": str(entry_date), "desc": description}
+                            text("INSERT INTO journal_entries (entry_date, description, project_name) VALUES (:d, :desc, :proj) RETURNING id"),
+                            {"d": str(entry_date), "desc": description, "proj": selected_project}
+                        ).scalar()
                         ).scalar()
                         conn.execute(
                             text("INSERT INTO journal_details (entry_id, account_id, debit, credit) VALUES (:eid, :aid, :amt, 0)"),
@@ -716,7 +735,78 @@ else:
         else:
             diff = total_assets - total_liab_eq
             st.error(f"❌ الفرق: {diff:,.2f}")
+# --- 9. المشاريع ومراكز التكلفة ---
+    with tabs[9]:
+        st.subheader("🏗️ إدارة المشاريع وتقارير مراكز التكلفة")
+        
+        col_pr1, col_pr2 = st.columns([1, 2])
+        with col_pr1:
+            st.markdown("#### ➕ إضافة مشروع عقاري جديد")
+            with st.form("add_project_form", clear_on_submit=True):
+                new_proj_name = st.text_input("اسم المشروع (مثال: كمبوند الياسمين - برج النيل)")
+                if st.form_submit_button("حفظ المشروع", type="primary"):
+                    if new_proj_name.strip():
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(
+                                    text("INSERT INTO projects (name) VALUES (:n)"),
+                                    {"n": new_proj_name.strip()}
+                                )
+                            st.success(f"✅ تم إضافة '{new_proj_name}' بنجاح!")
+                            st.rerun()
+                        except Exception:
+                            st.error("هذا المشروع مسجل بالفعل!")
+                    else:
+                        st.error("يرجى كتابة اسم المشروع.")
 
+        with col_pr2:
+            st.markdown("#### 📊 ملخص موقف المشاريع (التكاليف والإيرادات والأرباح)")
+            summary_proj_df = pd.read_sql(text("""
+                SELECT 
+                    COALESCE(e.project_name, 'عام / الإدارة') AS "اسم المشروع",
+                    COALESCE(SUM(CASE WHEN a.account_type = 'إيرادات' THEN (d.credit - d.debit) ELSE 0 END), 0) AS "إجمالي الإيرادات",
+                    COALESCE(SUM(CASE WHEN a.account_type = 'مصروفات' THEN (d.debit - d.credit) ELSE 0 END), 0) AS "إجمالي المصروفات",
+                    COALESCE(SUM(CASE WHEN a.code = '115' THEN (d.debit - d.credit) ELSE 0 END), 0) AS "تكلفة تحت التنفيذ (WIP)",
+                    (COALESCE(SUM(CASE WHEN a.account_type = 'إيرادات' THEN (d.credit - d.debit) ELSE 0 END), 0) -
+                     COALESCE(SUM(CASE WHEN a.account_type = 'مصروفات' THEN (d.debit - d.credit) ELSE 0 END), 0)) AS "صافي ربح المشروع"
+                FROM journal_entries e
+                JOIN journal_details d ON e.id = d.entry_id
+                JOIN accounts a ON d.account_id = a.id
+                GROUP BY COALESCE(e.project_name, 'عام / الإدارة')
+                ORDER BY "صافي ربح المشروع" DESC
+            """), engine)
+            
+            if not summary_proj_df.empty:
+                st.dataframe(summary_proj_df, use_container_width=True)
+            else:
+                st.info("لا توجد حركات مسجلة على المشاريع بعد.")
+
+        st.markdown("---")
+        st.markdown("#### 🔍 كشف حركات تفصيلي لمشروع محدد")
+        all_projs = pd.read_sql("SELECT name FROM projects ORDER BY id ASC", engine)
+        if not all_projs.empty:
+            chosen_proj = st.selectbox("اختر المشروع لعرض كافة قيوده ومصروفاته:", all_projs['name'].tolist())
+            proj_details_df = pd.read_sql(
+                text("""
+                    SELECT e.entry_date AS "التاريخ", e.id AS "رقم القيد", a.code AS "كود الحساب",
+                           a.name AS "اسم الحساب", e.description AS "البيان", d.debit AS "مدين", d.credit AS "دائن"
+                    FROM journal_entries e
+                    JOIN journal_details d ON e.id = d.entry_id
+                    JOIN accounts a ON d.account_id = a.id
+                    WHERE COALESCE(e.project_name, 'عام / الإدارة') = :p
+                    ORDER BY e.id DESC
+                """),
+                engine,
+                params={"p": chosen_proj}
+            )
+            if not proj_details_df.empty:
+                st.dataframe(proj_details_df, use_container_width=True)
+                st.download_button(
+                    label=f"📥 تصدير تقرير ({chosen_proj}) إلى Excel",
+                    data=to_excel(proj_details_df),
+                    file_name=f"project_{chosen_proj}.csv",
+                    mime="text/csv"
+                )
     # --- 9. إدارة المستخدمين ---
     if st.session_state['user_role'] == "مدير النظام":
         with tabs[8]:
@@ -774,7 +864,7 @@ else:
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-        with tabs[9]:
+        with tabs[10]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
