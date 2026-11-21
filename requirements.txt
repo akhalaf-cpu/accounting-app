@@ -1,1 +1,5 @@
-sqlalchemy,psycopg2-binary,openai,pandas,streamlit
+streamlit
+pandas
+openai
+psycopg2-binary
+sqlalchemy
