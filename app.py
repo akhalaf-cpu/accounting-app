@@ -860,7 +860,7 @@ else:
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-        with tabs[10]:
+        with tabs[9]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
