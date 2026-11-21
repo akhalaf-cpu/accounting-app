@@ -155,7 +155,7 @@ def init_db():
             )
         '''))
 conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
-        conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
+conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
 conn.execute(text('''       
             CREATE TABLE IF NOT EXISTS journal_details (
                 id SERIAL PRIMARY KEY,
