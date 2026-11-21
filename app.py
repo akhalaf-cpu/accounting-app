@@ -165,7 +165,7 @@ conn.execute(text('''
                 credit REAL DEFAULT 0.0
             )
         '''))
-        res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+    res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
         if res == 0:
             conn.execute(
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
