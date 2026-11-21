@@ -154,9 +154,9 @@ def init_db():
                 project_name TEXT DEFAULT 'عام / الإدارة'
             )
         '''))
-conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
-conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
-conn.execute(text('''       
+        conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
+        conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
+        conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_details (
                 id SERIAL PRIMARY KEY,
                 entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
@@ -165,13 +165,13 @@ conn.execute(text('''
                 credit REAL DEFAULT 0.0
             )
         '''))
-res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
-if res == 0:
+        res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        if res == 0:
             conn.execute(
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
             )
-def load_default_accounts():
+            def load_default_accounts():
     with engine.begin() as conn:
         for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
             conn.execute(
