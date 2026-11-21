@@ -391,7 +391,7 @@ else:
                         st.rerun()
 
             st.markdown("---")
-            ob_df = pd.read_sql("""
+            ob_df = pd.read_sql(text("""
                 SELECT e.entry_date AS "التاريخ", a.code AS "كود الحساب", a.name AS "اسم الحساب",
                        d.debit AS "رصيد مدين", d.credit AS "رصيد دائن", e.description AS "البيان"
                 FROM journal_entries e
@@ -399,7 +399,7 @@ else:
                 JOIN accounts a ON d.account_id = a.id
                 WHERE e.description LIKE 'رصيد افتتاحي%'
                 ORDER BY e.id DESC
-            """, engine)
+            """), engine)
             if not ob_df.empty:
                 st.dataframe(ob_df, use_container_width=True)
 
