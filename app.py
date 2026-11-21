@@ -171,7 +171,7 @@ def init_db():
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
             )
-            def load_default_accounts():
+def load_default_accounts():
     with engine.begin() as conn:
         for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
             conn.execute(
@@ -182,8 +182,7 @@ def init_db():
                 """),
                 {"c": code, "n": name, "t": acc_type, "p": parent_id, "a": allow_post}
             )
-
-init_db()
+            init_db()
 
 st.set_page_config(page_title="برنامجي المحاسبي السحابي", layout="wide")
 
