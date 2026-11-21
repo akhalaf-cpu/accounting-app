@@ -165,13 +165,12 @@ conn.execute(text('''
                 credit REAL DEFAULT 0.0
             )
         '''))
-    res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
-        if res == 0:
+res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+if res == 0:
             conn.execute(
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
             )
-
 def load_default_accounts():
     with engine.begin() as conn:
         for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
