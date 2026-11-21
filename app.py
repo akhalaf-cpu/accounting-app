@@ -468,7 +468,6 @@ else:
                             text("INSERT INTO journal_entries (entry_date, description, project_name) VALUES (:d, :desc, :proj) RETURNING id"),
                             {"d": str(entry_date), "desc": description, "proj": selected_project}
                         ).scalar()
-                        ).scalar()
                         conn.execute(
                             text("INSERT INTO journal_details (entry_id, account_id, debit, credit) VALUES (:eid, :aid, :amt, 0)"),
                             {"eid": entry_id, "aid": deb_id, "amt": debit_val}
