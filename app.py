@@ -140,7 +140,7 @@ def init_db():
                 balance REAL DEFAULT 0.0
             )
         '''))
-      conn.execute(text('''
+        conn.execute(text('''
             CREATE TABLE IF NOT EXISTS projects (
                 id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL
@@ -157,7 +157,8 @@ def init_db():
         conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
         proj_count = conn.execute(text("SELECT COUNT(*) FROM projects")).scalar()
         if proj_count == 0:
-            conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))        conn.execute(text('''
+            
+        conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))        conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_details (
                 id SERIAL PRIMARY KEY,
                 entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
