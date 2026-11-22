@@ -950,7 +950,7 @@ with engine.begin() as conn:
                         text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
                         {"c": inst_cust, "u": inst_unit}
                     )
-                st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
+st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
 st.rerun()
 df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
 if df_inst.empty:
