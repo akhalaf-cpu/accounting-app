@@ -247,8 +247,8 @@ if st.session_state['user_role'] == "مدير النظام":
         tabs_list.append("👥 إدارة المستخدمين")
         tabs_list.append("🤖 الـ AI وتحديث الكود")
     tabs = st.tabs(tabs_list)
-    with tabs[0]:
     # --- 1. شجرة الحسابات ---
+    with tabs[0]:
         st.subheader("🌳 إدارة وتأسيس شجرة الحسابات")
         if st.button("⚡ انشاء شجرة حسابات قياسية كاملاً", type="primary"):
             load_default_accounts()
