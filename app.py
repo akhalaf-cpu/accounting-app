@@ -156,7 +156,7 @@ def init_db():
         '''))
         conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
         conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
-        conn.execute(text('''
+        conn.execute(text("""
 conn.execute(text('''
 def init_db():
     with engine.begin() as conn:
