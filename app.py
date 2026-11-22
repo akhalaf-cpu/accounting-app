@@ -157,6 +157,7 @@ def init_db():
         conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
         conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
         conn.execute(text('''
+conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_details (
                 id SERIAL PRIMARY KEY,
                 entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
@@ -165,10 +166,10 @@ def init_db():
                 credit REAL DEFAULT 0.0
             )
         '''))
-conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_code TEXT"))
-conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tower_no TEXT"))
-conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'سكني'"))
-conn.execute(text('''
+        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_code TEXT"))
+        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tower_no TEXT"))
+        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'سكني'"))
+        conn.execute(text('''
             CREATE TABLE IF NOT EXISTS units (
                 id SERIAL PRIMARY KEY,
                 project_name TEXT,
@@ -179,15 +180,14 @@ conn.execute(text('''
                 status TEXT DEFAULT 'متاحة للبيع',
                 customer_name TEXT
             )
-        '''))        
-    res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
-    if res == 0:
+        '''))
+        res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        if res == 0:
             conn.execute(
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
             )
-def load_default_accounts():
-    with engine.begin() as conn:
+            with engine.begin() as conn:
         for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
             conn.execute(
                 text("""
