@@ -238,16 +238,15 @@ else:
         "⚖️ ميزان المراجعة", 
         "📑 كشف حساب",
         "📈 قائمة الدخل",
-        "🏛️ الميزانية العمومية"
-        "🏗️ المشاريع ومراكز التكلفة"
-    ]
-    
-    if st.session_state['user_role'] == "مدير النظام":
-        tabs_list.append("👥 إدارة المستخدمين")
-        tabs_list.append("🤖 الـ AI وتحديث الكود")
+"🏛️ الميزانية العمومية",
+    "🏗️ المشاريع ومراكز التكلفة",
+    "📅 أقساط العملاء"
+]
 
-    tabs = st.tabs(tabs_list)
-
+if st.session_state['user_role'] == "مدير النظام":
+    tabs_list.append("👥 إدارة المستخدمين")
+    tabs_list.append("🤖 الـ AI وتحديث الكود")
+tabs = st.tabs(tabs_list)
     # --- 1. شجرة الحسابات ---
     with tabs[0]:
         st.subheader("🌳 إدارة وتأسيس شجرة الحسابات")
@@ -803,9 +802,133 @@ else:
                     file_name=f"project_{chosen_proj}.csv",
                     mime="text/csv"
                 )
+                # --- 9. نظام أقساط العملاء ---
+    with tabs[8]:
+        st.subheader("📅 إدارة ومتابعة أقساط العملاء")
+
+        with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
+            with st.form("generate_installments_form"):
+                c1, c2, c3, c4 = st.columns(4)
+                proj_list = pd.read_sql("SELECT name FROM projects", engine)["name"].tolist()
+                inst_proj = c1.selectbox("المشروع (Project)", proj_list if proj_list else ["عام / الإدارة"])
+                inst_cust = c2.text_input("اسم العميل (Customer)")
+                inst_unit = c3.text_input("كود الوحدة (Unit Code)", placeholder="مثال: OB-QST-S048A")
+                inst_contract = c4.text_input("رقم العقد (Contract No)", placeholder="مثال: CNTRCT/078")
+
+                c5, c6, c7, c8 = st.columns(4)
+                down_payment = c5.number_input("الدفعة المقدمة (Down Payment)", min_value=0.0, step=1000.0)
+                down_date = c6.date_input("تاريخ الدفعة المقدمة", value=date.today())
+                reg_amount = c7.number_input("قيمة القسط الدوري (Regular)", min_value=0.0, step=1000.0)
+                reg_count = c8.number_input("عدد الأقساط الدورية", min_value=1, max_value=120, value=12, step=1)
+
+                c9, c10, c11 = st.columns(3)
+                first_reg_date = c9.date_input("تاريخ أول قسط دوري", value=date.today())
+                freq_label = c10.selectbox("دورية السداد", ["ربع سنوي (كل 3 شهور)", "شهري", "نصف سنوي (كل 6 شهور)", "سنوي"])
+                collector_name = c11.text_input("مسؤول التحصيل (Collector)")
+
+                submitted_plan = st.form_submit_button("🚀 توليد وحفظ جدول الأقساط", type="primary")
+                if submitted_plan:
+                    if not inst_cust or not inst_unit:
+                        st.error("يرجى إدخال اسم العميل وكود الوحدة!")
+                    else:
+                        freq_months = {"شهري": 1, "ربع سنوي (كل 3 شهور)": 3, "نصف سنوي (كل 6 شهور)": 6, "سنوي": 12}[freq_label]
+                        with engine.begin() as conn:
+                            if down_payment > 0:
+                                conn.execute(
+                                    text("""INSERT INTO installments 
+                                            (project_name, customer_name, unit_code, contract_no, installment_type, due_date, amount, paid_amount, collector_name, status)
+                                            VALUES (:p, :c, :u, :cn, 'Down Payment', :dd, :amt, 0, :col, 'Unpaid')"""),
+                                    {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": down_date, "amt": down_payment, "col": collector_name}
+                                )
+                            for i in range(int(reg_count)):
+                                months_add = i * freq_months
+                                y = first_reg_date.year + (first_reg_date.month + months_add - 1) // 12
+                                m = (first_reg_date.month + months_add - 1) % 12 + 1
+                                d = min(first_reg_date.day, 28)
+                                due_d = date(y, m, d)
+                                conn.execute(
+                                    text("""INSERT INTO installments 
+                                            (project_name, customer_name, unit_code, contract_no, installment_type, due_date, amount, paid_amount, collector_name, status)
+                                            VALUES (:p, :c, :u, :cn, 'Regular', :dd, :amt, 0, :col, 'Unpaid')"""),
+                                    {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": due_d, "amt": reg_amount, "col": collector_name}
+                                )
+                        st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
+                        st.rerun()
+
+        df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
+        if df_inst.empty:
+            st.info("لا توجد أقساط مسجلة حالياً. يمكنك إضافة أول خطة أقساط من القائمة أعلاه.")
+        else:
+            df_inst["remaining"] = df_inst["amount"] - df_inst["paid_amount"]
+
+            f1, f2, f3, f4 = st.columns(4)
+            sel_p = f1.selectbox("فلتر المشروع", ["الكل"] + sorted(df_inst["project_name"].dropna().unique().tolist()))
+            sel_c = f2.selectbox("فلتر العميل", ["الكل"] + sorted(df_inst["customer_name"].dropna().unique().tolist()))
+            sel_u = f3.text_input("بحث بكود الوحدة", "")
+            sel_s = f4.selectbox("حالة السداد", ["الكل", "Unpaid", "Partially Paid", "Paid"])
+
+            filtered = df_inst.copy()
+            if sel_p != "الكل":
+                filtered = filtered[filtered["project_name"] == sel_p]
+            if sel_c != "الكل":
+                filtered = filtered[filtered["customer_name"] == sel_c]
+            if sel_u:
+                filtered = filtered[filtered["unit_code"].str.contains(sel_u, case=False, na=False)]
+            if sel_s != "الكل":
+                filtered = filtered[filtered["status"] == sel_s]
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("إجمالي قيمة الأقساط", f"{filtered['amount'].sum():,.2f}")
+            m2.metric("إجمالي المحصل فعلياً", f"{filtered['paid_amount'].sum():,.2f}")
+            m3.metric("إجمالي المتبقي للتحصيل", f"{filtered['remaining'].sum():,.2f}")
+
+            display_df = filtered[[
+                "id", "project_name", "customer_name", "unit_code", "installment_type",
+                "due_date", "amount", "paid_amount", "remaining", "collector_name", "contract_no", "status"
+            ]].rename(columns={
+                "id": "رقم القسط",
+                "project_name": "Project",
+                "customer_name": "Customer",
+                "unit_code": "Unit Code",
+                "installment_type": "Installment Type",
+                "due_date": "Due Date",
+                "amount": "Amount",
+                "paid_amount": "Paid Amount",
+                "remaining": "Remaining (المتبقي)",
+                "collector_name": "Collector",
+                "contract_no": "Contract No",
+                "status": "Status"
+            })
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+            st.markdown("#### 💵 تسجيل تحصيل دفعة من قسط")
+            unpaid_df = filtered[filtered["status"] != "Paid"]
+            if not unpaid_df.empty:
+                col_p1, col_p2, col_p3 = st.columns([2, 1, 1])
+                options = {
+                    f"#{row['id']} | {row['customer_name']} - {row['unit_code']} ({row['installment_type']} - {row['due_date']}) | المتبقي: {row['remaining']:,.2f}": row["id"]
+                    for _, row in unpaid_df.iterrows()
+                }
+                chosen_label = col_p1.selectbox("اختر القسط المراد تحصيله", list(options.keys()))
+                chosen_id = options[chosen_label]
+                chosen_row = unpaid_df[unpaid_df["id"] == chosen_id].iloc[0]
+                pay_now = col_p2.number_input("المبلغ المحصل الآن", min_value=0.0, max_value=float(chosen_row["remaining"]), value=float(chosen_row["remaining"]), step=500.0)
+                col_p3.write("")
+                col_p3.write("")
+                if col_p3.button("✅ تأكيد التحصيل", type="primary"):
+                    new_paid = float(chosen_row["paid_amount"]) + pay_now
+                    new_status = "Paid" if new_paid >= float(chosen_row["amount"]) - 0.01 else ("Partially Paid" if new_paid > 0 else "Unpaid")
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("UPDATE installments SET paid_amount = :pa, status = :st WHERE id = :id"),
+                            {"pa": new_paid, "st": new_status, "id": int(chosen_id)}
+                        )
+                    st.success("تم تسجيل التحصيل وتحديث حالة القسط بنجاح!")
+                    st.rerun()
     # --- 9. إدارة المستخدمين ---
     if st.session_state['user_role'] == "مدير النظام":
-        with tabs[8]:
+        with tabs[9]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
@@ -860,7 +983,7 @@ else:
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-        with tabs[9]:
+        with tabs[10]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
