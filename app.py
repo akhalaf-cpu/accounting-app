@@ -954,7 +954,7 @@ st.rerun()
 df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
 if df_inst.empty:
             st.info("لا توجد أقساط مسجلة حالياً. يمكنك إضافة أول خطة أقساط من القائمة أعلاه.")
-        else:
+else:
             df_inst["remaining"] = df_inst["amount"] - df_inst["paid_amount"]
 
             f1, f2, f3, f4 = st.columns(4)
