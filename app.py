@@ -1066,7 +1066,7 @@ else:
                     mime="text/csv"
                 )
     # --- 9. إدارة المستخدمين ---
-    if st.session_state['user_role'] == "مدير النظام":
+if st.session_state['user_role'] == "مدير النظام":
         with tabs[10]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
