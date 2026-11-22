@@ -203,7 +203,7 @@ def init_db():
                 status TEXT DEFAULT 'متاحة للبيع',
                 customer_name TEXT
             )
-        '''))
+        """))
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS journal_entries (
                 id SERIAL PRIMARY KEY,
@@ -211,7 +211,7 @@ def init_db():
                 description TEXT,
                 project_name TEXT DEFAULT 'عام / الإدارة'
             )
-        '''))
+        """))
         conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
         conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
         conn.execute(text('''
@@ -222,7 +222,7 @@ def init_db():
                 debit REAL DEFAULT 0.0,
                 credit REAL DEFAULT 0.0
             )
-        '''))
+        """))
         res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
         if res == 0:
             conn.execute(
