@@ -243,7 +243,7 @@ else:
     "📅 أقساط العملاء"
 ]
 
-if st.session_state['user_role'] == "مدير النظام":
+    if st.session_state['user_role'] == "مدير النظام":
         tabs_list.append("👥 إدارة المستخدمين")
         tabs_list.append("🤖 الـ AI وتحديث الكود")
     tabs = st.tabs(tabs_list)
