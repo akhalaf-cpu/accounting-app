@@ -180,8 +180,8 @@ conn.execute(text('''
                 customer_name TEXT
             )
         '''))        
-        res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
-        if res == 0:
+    res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+    if res == 0:
             conn.execute(
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
