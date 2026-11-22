@@ -803,7 +803,7 @@ else:
                     mime="text/csv"
                 )
                 # --- 9. نظام أقساط العملاء ---
-    with tabs[8]:
+    with tabs[9]:
         st.subheader("📅 إدارة ومتابعة أقساط العملاء")
 
         with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
@@ -928,7 +928,7 @@ else:
                     st.rerun()
     # --- 9. إدارة المستخدمين ---
     if st.session_state['user_role'] == "مدير النظام":
-        with tabs[9]:
+        with tabs[10]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
@@ -983,7 +983,7 @@ else:
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-        with tabs[10]:
+        with tabs[11]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
