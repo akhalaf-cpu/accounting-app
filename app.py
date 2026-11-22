@@ -165,6 +165,21 @@ def init_db():
                 credit REAL DEFAULT 0.0
             )
         '''))
+conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_code TEXT"))
+        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tower_no TEXT"))
+        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'سكني'"))
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS units (
+                id SERIAL PRIMARY KEY,
+                project_name TEXT,
+                unit_code TEXT UNIQUE,
+                area REAL DEFAULT 0.0,
+                price_per_meter REAL DEFAULT 0.0,
+                total_price REAL DEFAULT 0.0,
+                status TEXT DEFAULT 'متاحة للبيع',
+                customer_name TEXT
+            )
+        '''))        
         res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
         if res == 0:
             conn.execute(
@@ -730,78 +745,113 @@ else:
         else:
             diff = total_assets - total_liab_eq
             st.error(f"❌ الفرق: {diff:,.2f}")
-# --- 9. المشاريع ومراكز التكلفة ---
-    with tabs[9]:
-        st.subheader("🏗️ إدارة المشاريع وتقارير مراكز التكلفة")
-        
-        col_pr1, col_pr2 = st.columns([1, 2])
-        with col_pr1:
-            st.markdown("#### ➕ إضافة مشروع عقاري جديد")
-            with st.form("add_project_form", clear_on_submit=True):
-                new_proj_name = st.text_input("اسم المشروع (مثال: كمبوند الياسمين - برج النيل)")
-                if st.form_submit_button("حفظ المشروع", type="primary"):
-                    if new_proj_name.strip():
-                        try:
-                            with engine.begin() as conn:
-                                conn.execute(
-                                    text("INSERT INTO projects (name) VALUES (:n)"),
-                                    {"n": new_proj_name.strip()}
-                                )
-                            st.success(f"✅ تم إضافة '{new_proj_name}' بنجاح!")
-                            st.rerun()
-                        except Exception:
-                            st.error("هذا المشروع مسجل بالفعل!")
-                    else:
-                        st.error("يرجى كتابة اسم المشروع.")
+# --- 9. المشاريع والوحدات العقارية ---
+    with tabs[8]:
+        st.subheader("🏗️ إدارة المشاريع العقارية والوحدات")
+        proj_sub1, proj_sub2, proj_sub3 = st.tabs(["🏢 بيانات المشاريع والأبراج", "🏠 وحدات المشروع والأسعار", "📊 تقرير أرباح وتكاليف المشروع"])
 
-        with col_pr2:
-            st.markdown("#### 📊 ملخص موقف المشاريع (التكاليف والإيرادات والأرباح)")
-            summary_proj_df = pd.read_sql(text("""
-                SELECT 
-                    COALESCE(e.project_name, 'عام / الإدارة') AS "اسم المشروع",
-                    COALESCE(SUM(CASE WHEN a.account_type = 'إيرادات' THEN (d.credit - d.debit) ELSE 0 END), 0) AS "إجمالي الإيرادات",
-                    COALESCE(SUM(CASE WHEN a.account_type = 'مصروفات' THEN (d.debit - d.credit) ELSE 0 END), 0) AS "إجمالي المصروفات",
-                    COALESCE(SUM(CASE WHEN a.code = '115' THEN (d.debit - d.credit) ELSE 0 END), 0) AS "تكلفة تحت التنفيذ (WIP)",
-                    (COALESCE(SUM(CASE WHEN a.account_type = 'إيرادات' THEN (d.credit - d.debit) ELSE 0 END), 0) -
-                     COALESCE(SUM(CASE WHEN a.account_type = 'مصروفات' THEN (d.debit - d.credit) ELSE 0 END), 0)) AS "صافي ربح المشروع"
-                FROM journal_entries e
-                JOIN journal_details d ON e.id = d.entry_id
-                JOIN accounts a ON d.account_id = a.id
-                GROUP BY COALESCE(e.project_name, 'عام / الإدارة')
-                ORDER BY "صافي ربح المشروع" DESC
-            """), engine)
-            
-            if not summary_proj_df.empty:
-                st.dataframe(summary_proj_df, use_container_width=True)
-            else:
-                st.info("لا توجد حركات مسجلة على المشاريع بعد.")
+        with proj_sub1:
+            col_pr1, col_pr2 = st.columns([1, 2])
+            with col_pr1:
+                st.markdown("#### ➕ إضافة مشروع جديد")
+                with st.form("add_project_form", clear_on_submit=True):
+                    new_proj_code = st.text_input("كود المشروع (Project Code)", placeholder="مثال: PRJ-01")
+                    new_proj_name = st.text_input("اسم المشروع", placeholder="مثال: كمبوند الياسمين")
+                    new_tower_no = st.text_input("رقم البرج / المرحلة (Tower No)", placeholder="مثال: برج A1")
+                    new_proj_type = st.selectbox("نوع المشروع", ["سكني", "تجاري", "إداري", "سكني تجاري"])
+                    if st.form_submit_button("حفظ المشروع", type="primary"):
+                        if new_proj_name.strip() and new_proj_code.strip():
+                            try:
+                                with engine.begin() as conn:
+                                    conn.execute(
+                                        text("INSERT INTO projects (project_code, name, tower_no, project_type) VALUES (:c, :n, :t, :tp)"),
+                                        {"c": new_proj_code.strip(), "n": new_proj_name.strip(), "t": new_tower_no.strip(), "tp": new_proj_type}
+                                    )
+                                st.success(f"✅ تم إضافة المشروع '{new_proj_name}' بكود '{new_proj_code}' بنجاح!")
+                                st.rerun()
+                            except Exception:
+                                st.error("⚠️ اسم المشروع أو الكود مسجل بالفعل!")
+                        else:
+                            st.error("يرجى إدخال كود المشروع واسمه.")
+            with col_pr2:
+                st.markdown("#### 📋 قائمة المشاريع المسجلة (البحث بالكود أو الاسم)")
+                search_code = st.text_input("🔍 ادخل كود المشروع للوصول السريع:", placeholder="اكتب كود المشروع هنا...")
+                projs_df = pd.read_sql("SELECT id, project_code AS \"كود المشروع\", name AS \"اسم المشروع\", tower_no AS \"رقم البرج\", project_type AS \"النوع\" FROM projects", engine)
+                if search_code.strip():
+                    projs_df = projs_df[projs_df["كود المشروع"].fillna("").str.contains(search_code.strip(), case=False)]
+                st.dataframe(projs_df, use_container_width=True, hide_index=True)
 
-        st.markdown("---")
-        st.markdown("#### 🔍 كشف حركات تفصيلي لمشروع محدد")
-        all_projs = pd.read_sql("SELECT name FROM projects ORDER BY id ASC", engine)
-        if not all_projs.empty:
-            chosen_proj = st.selectbox("اختر المشروع لعرض كافة قيوده ومصروفاته:", all_projs['name'].tolist())
-            proj_details_df = pd.read_sql(
-                text("""
-                    SELECT e.entry_date AS "التاريخ", e.id AS "رقم القيد", a.code AS "كود الحساب",
-                           a.name AS "اسم الحساب", e.description AS "البيان", d.debit AS "مدين", d.credit AS "دائن"
-                    FROM journal_entries e
-                    JOIN journal_details d ON e.id = d.entry_id
-                    JOIN accounts a ON d.account_id = a.id
-                    WHERE COALESCE(e.project_name, 'عام / الإدارة') = :p
-                    ORDER BY e.id DESC
-                """),
-                engine,
-                params={"p": chosen_proj}
-            )
-            if not proj_details_df.empty:
-                st.dataframe(proj_details_df, use_container_width=True)
-                st.download_button(
-                    label=f"📥 تصدير تقرير ({chosen_proj}) إلى Excel",
-                    data=to_excel(proj_details_df),
-                    file_name=f"project_{chosen_proj}.csv",
-                    mime="text/csv"
-                )
+        with proj_sub2:
+            st.markdown("#### 🏠 إضافة وإدارة وحدات المشروع")
+            all_projs = pd.read_sql("SELECT name, project_code FROM projects", engine)
+            proj_options = [f"{r['project_code']} - {r['name']}" if r['project_code'] else r['name'] for _, r in all_projs.iterrows()]
+            proj_map = {(f"{r['project_code']} - {r['name']}" if r['project_code'] else r['name']): r['name'] for _, r in all_projs.iterrows()}
+
+            if proj_options:
+                sel_proj_label = st.selectbox("اختر المشروع (بالكود أو الاسم):", proj_options, key="unit_proj_sel")
+                sel_proj_name = proj_map[sel_proj_label]
+
+                with st.expander("➕ إضافة وحدة جديدة للمشروع", expanded=True):
+                    with st.form("add_unit_form", clear_on_submit=True):
+                        u_c1, u_c2, u_c3, u_c4 = st.columns(4)
+                        u_code = u_c1.text_input("كود / رقم الوحدة", placeholder="مثال: A1-102")
+                        u_area = u_c2.number_input("مساحة الوحدة (م²)", min_value=1.0, value=100.0, step=5.0)
+                        u_ppm = u_c3.number_input("سعر المتر", min_value=0.0, value=10000.0, step=500.0)
+                        u_status = u_c4.selectbox("حالة الوحدة", ["متاحة للبيع", "محجوزة", "مباعة"])
+                        u_cust = st.text_input("اسم العميل (في حالة الحجز أو البيع - اختياري)")
+                        if st.form_submit_button("💾 حفظ الوحدة", type="primary"):
+                            if u_code.strip():
+                                total_p = u_area * u_ppm
+                                try:
+                                    with engine.begin() as conn:
+                                        conn.execute(
+                                            text("""INSERT INTO units (project_name, unit_code, area, price_per_meter, total_price, status, customer_name)
+                                                    VALUES (:p, :uc, :ar, :ppm, :tp, :st, :cn)"""),
+                                            {"p": sel_proj_name, "uc": u_code.strip(), "ar": u_area, "ppm": u_ppm, "tp": total_p, "st": u_status, "cn": u_cust.strip()}
+                                        )
+                                    st.success(f"✅ تم إضافة الوحدة '{u_code}' بسعر إجمالي {total_p:,.2f}")
+                                    st.rerun()
+                                except Exception:
+                                    st.error("⚠️ كود الوحدة مسجل بالفعل!")
+                            else:
+                                st.error("يرجى إدخال كود الوحدة.")
+
+                units_df = pd.read_sql(text("""
+                    SELECT unit_code AS "كود الوحدة", area AS "المساحة (م²)", price_per_meter AS "سعر المتر",
+                           total_price AS "سعر الوحدة الكامل", status AS "الحالة", customer_name AS "العميل"
+                    FROM units WHERE project_name = :p
+                """), engine, params={"p": sel_proj_name})
+
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("إجمالي الوحدات", len(units_df))
+                m2.metric("🟢 متاحة للبيع", len(units_df[units_df["الحالة"] == "متاحة للبيع"]))
+                m3.metric("🟡 محجوزة", len(units_df[units_df["الحالة"] == "محجوزة"]))
+                m4.metric("🔴 مباعة", len(units_df[units_df["الحالة"] == "مباعة"]))
+                st.dataframe(units_df, use_container_width=True, hide_index=True)
+
+        with proj_sub3:
+            st.markdown("#### 📊 تقرير تكاليف وإيرادات كل مشروع على حدة")
+            projs_list = pd.read_sql("SELECT name FROM projects", engine)["name"].tolist()
+            if projs_list:
+                chosen_proj = st.selectbox("اختر المشروع لعرض حساباته المستقلة:", projs_list, key="rep_proj_sel")
+                proj_details_df = pd.read_sql(text("""
+                    SELECT je.entry_date AS "التاريخ", a.code AS "كود الحساب", a.name AS "اسم الحساب",
+                           a.account_type AS "نوع الحساب", je.description AS "البيان",
+                           jd.debit AS "مدين", jd.credit AS "دائن"
+                    FROM journal_details jd
+                    JOIN journal_entries je ON jd.entry_id = je.id
+                    JOIN accounts a ON jd.account_id = a.id
+                    WHERE je.project_name = :p
+                    ORDER BY je.entry_date DESC, je.id DESC
+                """), engine, params={"p": chosen_proj})
+
+                tot_rev = proj_details_df[proj_details_df["نوع الحساب"] == "إيرادات"]["دائن"].sum() - proj_details_df[proj_details_df["نوع الحساب"] == "إيرادات"]["مدين"].sum()
+                tot_exp = proj_details_df[proj_details_df["نوع الحساب"] == "مصروفات"]["مدين"].sum() - proj_details_df[proj_details_df["نوع الحساب"] == "مصروفات"]["دائن"].sum()
+                c_p1, c_p2, c_p3 = st.columns(3)
+                c_p1.metric("إيرادات المشروع", f"{tot_rev:,.2f}")
+                c_p2.metric("مصروفات وتكاليف المشروع", f"{tot_exp:,.2f}")
+                c_p3.metric("صافي ربح المشروع", f"{(tot_rev - tot_exp):,.2f}")
+                st.dataframe(proj_details_df, use_container_width=True, hide_index=True)
                 # --- 9. نظام أقساط العملاء ---
     with tabs[9]:
         st.subheader("📅 إدارة ومتابعة أقساط العملاء")
@@ -852,10 +902,13 @@ else:
                                             VALUES (:p, :c, :u, :cn, 'Regular', :dd, :amt, 0, :col, 'Unpaid')"""),
                                     {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": due_d, "amt": reg_amount, "col": collector_name}
                                 )
-                        st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
-                        st.rerun()
-
-        df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
+conn.execute(
+                    text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
+                    {"c": inst_cust.strip(), "u": inst_unit.strip()}
+                )
+            st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
+            st.rerun()
+df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
         if df_inst.empty:
             st.info("لا توجد أقساط مسجلة حالياً. يمكنك إضافة أول خطة أقساط من القائمة أعلاه.")
         else:
@@ -926,6 +979,49 @@ else:
                         )
                     st.success("تم تسجيل التحصيل وتحديث حالة القسط بنجاح!")
                     st.rerun()
+                    st.markdown("---")
+            st.markdown("#### 🧾 كشف حساب تفصيلي للعميل")
+            cust_list = sorted(df_inst["customer_name"].dropna().unique().tolist())
+            if cust_list:
+                chosen_cust = st.selectbox("اختر اسم العميل لعرض كشف حسابه:", cust_list, key="cust_stmt_sel")
+                cust_df = df_inst[df_inst["customer_name"] == chosen_cust].copy()
+                cust_units = ", ".join(cust_df["unit_code"].dropna().unique().tolist())
+                cust_projects = ", ".join(cust_df["project_name"].dropna().unique().tolist())
+
+                st.info(f"**العميل:** {chosen_cust} | **المشروع:** {cust_projects} | **الوحدة / الوحدات:** {cust_units}")
+
+                c_tot = cust_df["amount"].sum()
+                c_paid = cust_df["paid_amount"].sum()
+                c_rem = cust_df["remaining"].sum()
+
+                cs1, cs2, cs3 = st.columns(3)
+                cs1.metric("إجمالي قيمة التعاقد / الأقساط", f"{c_tot:,.2f}")
+                cs2.metric("إجمالي المسدد من العميل", f"{c_paid:,.2f}")
+                cs3.metric("إجمالي المتبقي على العميل", f"{c_rem:,.2f}")
+
+                stmt_view = cust_df[[
+                    "id", "project_name", "unit_code", "contract_no", "installment_type",
+                    "due_date", "amount", "paid_amount", "remaining", "status", "collector_name"
+                ]].rename(columns={
+                    "id": "رقم القسط",
+                    "project_name": "المشروع",
+                    "unit_code": "كود الوحدة",
+                    "contract_no": "رقم العقد",
+                    "installment_type": "نوع القسط",
+                    "due_date": "تاريخ الاستحقاق",
+                    "amount": "قيمة القسط",
+                    "paid_amount": "المسدد",
+                    "remaining": "المتبقي",
+                    "status": "الحالة",
+                    "collector_name": "المحصّل"
+                })
+                st.dataframe(stmt_view, use_container_width=True, hide_index=True)
+                st.download_button(
+                    label=f"📥 تصدير كشف حساب العميل ({chosen_cust}) إلى Excel",
+                    data=to_excel(stmt_view),
+                    file_name=f"statement_{chosen_cust}.csv",
+                    mime="text/csv"
+                )
     # --- 9. إدارة المستخدمين ---
     if st.session_state['user_role'] == "مدير النظام":
         with tabs[10]:
