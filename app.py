@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 
 # يقرأ رابط قاعدة البيانات السحابية من إعدادات Streamlit Secrets بأمان
 DB_URL = st.secrets["DATABASE_URL"]
-engine = create_engine(DB_URL, pool_pre_ping=True)
+engine = create_engine(DB_URL, connect_args={"prepare_threshold": None}, pool_pre_ping=True)
 
 TYPES = ["أصول", "خصوم", "حقوق ملكية", "إيرادات", "مصروفات"]
 
