@@ -229,8 +229,8 @@ def init_db():
                 text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                 {"u": "admin", "p": make_hashes("admin123"), "r": "مدير النظام"}
             )
-            with engine.begin() as conn:
-        for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
+    with engine.begin() as conn:
+    for code, name, acc_type, parent_id, allow_post in DEFAULT_ACCOUNTS:
             conn.execute(
                 text("""
                     INSERT INTO accounts (code, name, account_type, parent_id, allow_posting)
