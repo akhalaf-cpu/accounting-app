@@ -204,7 +204,7 @@ def init_db():
                 customer_name TEXT
             )
         """))
-        conn.execute(text('''
+        conn.execute(text("""
             CREATE TABLE IF NOT EXISTS journal_entries (
                 id SERIAL PRIMARY KEY,
                 entry_date TEXT NOT NULL,
