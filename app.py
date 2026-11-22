@@ -158,12 +158,34 @@ def init_db():
         conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
         conn.execute(text('''
 conn.execute(text('''
-            CREATE TABLE IF NOT EXISTS journal_details (
+def init_db():
+    with engine.begin() as conn:
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
-                entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
-                account_id INTEGER NOT NULL REFERENCES accounts(id),
-                debit REAL DEFAULT 0.0,
-                credit REAL DEFAULT 0.0
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL
+            )
+        '''))
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS accounts (
+                id SERIAL PRIMARY KEY,
+                code TEXT UNIQUE,
+                name TEXT NOT NULL,
+                account_type TEXT NOT NULL,
+                parent_id INTEGER,
+                allow_posting INTEGER DEFAULT 1,
+                balance REAL DEFAULT 0.0
+            )
+        '''))
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                project_code TEXT,
+                tower_no TEXT,
+                project_type TEXT DEFAULT 'سكني'
             )
         '''))
         conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_code TEXT"))
@@ -179,6 +201,25 @@ conn.execute(text('''
                 total_price REAL DEFAULT 0.0,
                 status TEXT DEFAULT 'متاحة للبيع',
                 customer_name TEXT
+            )
+        '''))
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id SERIAL PRIMARY KEY,
+                entry_date TEXT NOT NULL,
+                description TEXT,
+                project_name TEXT DEFAULT 'عام / الإدارة'
+            )
+        '''))
+        conn.execute(text("ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'عام / الإدارة'"))
+        conn.execute(text("INSERT INTO projects (name) VALUES ('عام / الإدارة') ON CONFLICT DO NOTHING"))
+        conn.execute(text('''
+            CREATE TABLE IF NOT EXISTS journal_details (
+                id SERIAL PRIMARY KEY,
+                entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES accounts(id),
+                debit REAL DEFAULT 0.0,
+                credit REAL DEFAULT 0.0
             )
         '''))
         res = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
