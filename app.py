@@ -166,9 +166,9 @@ def init_db():
             )
         '''))
 conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_code TEXT"))
-        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tower_no TEXT"))
-        conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'سكني'"))
-        conn.execute(text('''
+conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tower_no TEXT"))
+conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'سكني'"))
+conn.execute(text('''
             CREATE TABLE IF NOT EXISTS units (
                 id SERIAL PRIMARY KEY,
                 project_name TEXT,
