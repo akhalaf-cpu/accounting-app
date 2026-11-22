@@ -945,7 +945,7 @@ else:
                                             VALUES (:p, :c, :u, :cn, 'Regular', :dd, :amt, 0, :col, 'Unpaid')"""),
                                     {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": due_d, "amt": reg_amount, "col": collector_name}
                                 )
-conn.execute(
+    conn.execute(
                     text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
                     {"c": inst_cust.strip(), "u": inst_unit.strip()}
                 )
