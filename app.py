@@ -1114,9 +1114,9 @@ with col_u_edit:
                             st.success("✅ تم التحديث بنجاح!")
                             st.rerun()
 
-        st.markdown("---")
-        users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
-        st.dataframe(users_df, use_container_width=True)
+    st.markdown("---")
+    users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
+    st.dataframe(users_df, use_container_width=True)
 
     # --- 10. التحديث التلقائي الـ AI ---
     with tabs[10]:
