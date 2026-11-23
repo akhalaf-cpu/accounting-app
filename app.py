@@ -1114,7 +1114,7 @@ with col_u_edit:
                             st.success("✅ تم التحديث بنجاح!")
                             st.rerun()
 
-            st.markdown("---")
+st.markdown("---")
             users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
             st.dataframe(users_df, use_container_width=True)
 
