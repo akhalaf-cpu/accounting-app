@@ -1068,18 +1068,18 @@ else:
                 )
     # --- 9. إدارة المستخدمين ---
 if st.session_state['user_role'] == "مدير النظام":
-with tabs[9]:
+    with tabs[9]:
             col_u_add, col_u_edit = st.columns(2)
-with col_u_add:
+    with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
-with st.form("new_user_form", clear_on_submit=True):
+    with st.form("new_user_form", clear_on_submit=True):
                     new_username = st.text_input("اسم المستخدم")
                     new_password = st.text_input("كلمة السر", type="password")
                     new_role = st.selectbox("الصلاحية", ["محاسب / مدخل بيانات", "مدير النظام"])
                     if st.form_submit_button("إضافة المستخدم"):
                         if new_username and new_password:
                             try:
-with engine.begin() as conn:
+    with engine.begin() as conn:
                                     conn.execute(
                                         text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
                                         {"u": new_username, "p": make_hashes(new_password), "r": new_role}
@@ -1089,7 +1089,7 @@ with engine.begin() as conn:
                             except Exception:
                                 st.error("المستخدم موجود مسبقاً!")
 
- with col_u_edit:
+     with col_u_edit:
                 st.subheader("⚙️ تعديل بيانات مستخدم")
                 all_users_df = pd.read_sql("SELECT id, username, role FROM users", engine)
 
@@ -1098,13 +1098,13 @@ with engine.begin() as conn:
                     selected_u_label = st.selectbox("اختر المستخدم:", list(user_dict.keys()))
                     target_username = user_dict[selected_u_label]
 
-with st.form("edit_user_form"):
+    with st.form("edit_user_form"):
                         updated_username = st.text_input("الاسم المعدل", value=target_username)
                         updated_password = st.text_input("كلمة السر الجديدة", type="password")
                         updated_role = st.selectbox("الصلاحية الجديدة", ["محاسب / مدخل بيانات", "مدير النظام"])
 
                         if st.form_submit_button("حفظ التغييرات"):
-with engine.begin() as conn:
+    with engine.begin() as conn:
                                 if updated_password:
                                     conn.execute(
                                         text("UPDATE users SET username = :nu, password = :np, role = :nr WHERE username = :ou"),
@@ -1123,7 +1123,7 @@ with engine.begin() as conn:
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-with tabs[10]:
+    with tabs[10]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
@@ -1137,8 +1137,8 @@ with tabs[10]:
                     try:
                         from openai import OpenAI
                         client = OpenAI(api_key=api_key)
-with st.spinner("جار كتابة الكود المحدث..."):
-with open(__file__, "r", encoding="utf-8") as f:
+    with st.spinner("جار كتابة الكود المحدث..."):
+    with open(__file__, "r", encoding="utf-8") as f:
                                 current_code = f.read()
 
                             prompt = f"""
