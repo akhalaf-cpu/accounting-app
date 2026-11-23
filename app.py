@@ -1078,7 +1078,7 @@ if st.session_state['user_role'] == "مدير النظام":
                     new_role = st.selectbox("الصلاحية", ["محاسب / مدخل بيانات", "مدير النظام"])
                     if st.form_submit_button("إضافة المستخدم"):
                         if new_username and new_password:
-try:
+    try:
                             with engine.begin() as conn:
                                 conn.execute(
                                     text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
