@@ -949,9 +949,9 @@ with engine.begin() as conn:
     conn.execute(
                         text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
                         {"c": inst_cust, "u": inst_unit}
-                    )
-st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
-st.rerun()
+    )
+    st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
+    st.rerun()
 df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
 if df_inst.empty:
             st.info("لا توجد أقساط مسجلة حالياً. يمكنك إضافة أول خطة أقساط من القائمة أعلاه.")
