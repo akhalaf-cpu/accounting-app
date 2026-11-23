@@ -1068,27 +1068,27 @@ else:
                 )
     # --- 9. إدارة المستخدمين ---
 if st.session_state['user_role'] == "مدير النظام":
-    with tabs[9]:
+        with tabs[9]:
             col_u_add, col_u_edit = st.columns(2)
-    with col_u_add:
+            with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
-    with st.form("new_user_form", clear_on_submit=True):
+                with st.form("new_user_form", clear_on_submit=True):
                     new_username = st.text_input("اسم المستخدم")
                     new_password = st.text_input("كلمة السر", type="password")
-                    new_role = st.selectbox("الصلاحية", ["محاسب / مدخل بيانات", "مدير النظام"])
+                    new_role = st.selectbox("الصلاحية", ["مدير النظام", "محاسب / مدخل بيانات"])
                     if st.form_submit_button("إضافة المستخدم"):
                         if new_username and new_password:
-    try:
-                            with engine.begin() as conn:
-                                conn.execute(
-                                    text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
-                                    {"u": new_username, "p": make_hashes(new_password), "r": new_role}
-                                )
-                            st.success("✅ تم الإضافة بنجاح!")
-                            st.rerun()
-                        except Exception:
-                            st.error("المستخدم موجود مسبقاً!")
-    with col_u_edit:
+                            try:
+                                with engine.begin() as conn:
+                                    conn.execute(
+                                        text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
+                                        {"u": new_username, "p": make_hashes(new_password), "r": new_role}
+                                    )
+                                st.success("✅ تم الإضافة بنجاح!")
+                                st.rerun()
+                            except Exception:
+                                st.error("المستخدم موجود مسبقاً!")
+                                with col_u_edit:
                 st.subheader("⚙️ تعديل بيانات مستخدم")
                 all_users_df = pd.read_sql("SELECT id, username, role FROM users", engine)
 
