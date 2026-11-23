@@ -946,13 +946,12 @@ else:
                                     {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": due_d, "amt": reg_amount, "col": collector_name}
                                 )
 with engine.begin() as conn:
-    conn.execute(
+                    conn.execute(
                         text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
                         {"c": inst_cust, "u": inst_unit}
-    )
-    st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
-    st.rerun()
-df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
+                    )
+                    st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
+                    st.rerun()df_inst = pd.read_sql("SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine)
 if df_inst.empty:
             st.info("لا توجد أقساط مسجلة حالياً. يمكنك إضافة أول خطة أقساط من القائمة أعلاه.")
 else:
@@ -1068,7 +1067,7 @@ else:
                 )
     # --- 9. إدارة المستخدمين ---
 if st.session_state['user_role'] == "مدير النظام":
-        with tabs[10]:
+    with tabs[9]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
@@ -1123,7 +1122,7 @@ if st.session_state['user_role'] == "مدير النظام":
             st.dataframe(users_df, use_container_width=True)
 
         # --- 10. الـ AI والتحديث التلقائي ---
-        with tabs[11]:
+    with tabs[10]:
             st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
             st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
