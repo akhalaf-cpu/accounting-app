@@ -1088,22 +1088,19 @@ if st.session_state['user_role'] == "مدير النظام":
                                 st.rerun()
                             except Exception:
                                 st.error("المستخدم موجود مسبقاً!")
-                                with col_u_edit:
+with col_u_edit:
                 st.subheader("⚙️ تعديل بيانات مستخدم")
                 all_users_df = pd.read_sql("SELECT id, username, role FROM users", engine)
-
                 if not all_users_df.empty:
                     user_dict = {f"{row['username']} ({row['role']})": row['username'] for _, row in all_users_df.iterrows()}
                     selected_u_label = st.selectbox("اختر المستخدم:", list(user_dict.keys()))
                     target_username = user_dict[selected_u_label]
-
-    with st.form("edit_user_form"):
+                    with st.form("edit_user_form"):
                         updated_username = st.text_input("الاسم المعدل", value=target_username)
                         updated_password = st.text_input("كلمة السر الجديدة", type="password")
-                        updated_role = st.selectbox("الصلاحية الجديدة", ["محاسب / مدخل بيانات", "مدير النظام"])
-
+                        updated_role = st.selectbox("الصلاحية الجديدة", ["مدير النظام", "محاسب / مدخل بيانات"])
                         if st.form_submit_button("حفظ التغييرات"):
-    with engine.begin() as conn:
+                            with engine.begin() as conn:
                                 if updated_password:
                                     conn.execute(
                                         text("UPDATE users SET username = :nu, password = :np, role = :nr WHERE username = :ou"),
