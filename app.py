@@ -1115,28 +1115,27 @@ with col_u_edit:
                             st.rerun()
 
 st.markdown("---")
-    users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
-    st.dataframe(users_df, use_container_width=True)
+            users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
+            st.dataframe(users_df, use_container_width=True)
 
-        # --- 10. الـ AI والتحديث التلقائي ---
+    # --- 10. التحديث التلقائي الـ AI ---
     with tabs[10]:
-            st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
-            st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
+        st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
+        st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
-            api_key = st.text_input("مفتاح OpenAI API Key الخاص بك:", type="password")
-            ai_instruction = st.text_area("ما التعديل أو الميزة التي ترغب في إضافتها إلى الكود؟")
+        api_key = st.text_input("مفتاح OpenAI API Key الخاص بك:", type="password")
+        ai_instruction = st.text_area("ما التعديل أو الميزة التي ترغب في إضافتها إلى الكود؟")
 
-            if st.button("🚀 توليد الكود المعدل", type="primary"):
-                if not api_key or not ai_instruction:
-                    st.error("يرجى إدخال API Key والتعديل المطلوب!")
-                else:
-                    try:
-                        from openai import OpenAI
-                        client = OpenAI(api_key=api_key)
-    with st.spinner("جار كتابة الكود المحدث..."):
-    with open(__file__, "r", encoding="utf-8") as f:
-                                current_code = f.read()
-
+        if st.button("🚀 توليد الكود المعدل", type="primary"):
+            if not api_key or not ai_instruction:
+                st.error("يرجى إدخال API Key والتعديل المطلوب!")
+            else:
+                try:
+                    from openai import OpenAI
+                    client = OpenAI(api_key=api_key)
+                    with st.spinner("جار كتابة الكود المحدث..."):
+                        with open(__file__, "r", encoding="utf-8") as f:
+                            current_code = f.read()
                             prompt = f"""
                             أنت خبير برمجة Streamlit و PostgreSQL المحاسبي.
                             إليك كود تطبيق محاسبي كاملاً:
