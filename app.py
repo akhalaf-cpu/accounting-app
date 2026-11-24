@@ -1115,10 +1115,11 @@ with col_u_edit:
                             st.rerun()
 
 st.markdown("---")
-users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
-st.dataframe(users_df, use_container_width=True)
-                 # --- 10. التحديث التلقائي الـ AI ---
-        with tabs[10]:
+        users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
+        st.dataframe(users_df, use_container_width=True)
+
+    # --- 10. التحديث التلقائي الـ AI ---
+    with tabs[10]:
         st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
         st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
