@@ -1065,9 +1065,9 @@ else:
                     file_name=f"statement_{chosen_cust}.csv",
                     mime="text/csv"
                 )
-    # --- 9. إدارة المستخدمين ---
+    # --- 10. إدارة المستخدمين ---
 if st.session_state['user_role'] == "مدير النظام":
-        with tabs[9]:
+        with tabs[10]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
@@ -1117,8 +1117,8 @@ st.markdown("---")
 users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
 st.dataframe(users_df, use_container_width=True)
 
-    # --- 10. التحديث التلقائي الـ AI ---
-with tabs[10]:
+    # --- 11. التحديث التلقائي الـ AI ---
+with tabs[11]:
         st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
         st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
