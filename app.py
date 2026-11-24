@@ -946,8 +946,7 @@ else:
                                     {"p": inst_proj, "c": inst_cust, "u": inst_unit, "cn": inst_contract, "dd": due_d, "amt": reg_amount, "col": collector_name}
                                 )
 with engine.begin() as conn:
-                    conn.execute(
-                        text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
+                    conn.execute( text("UPDATE units SET status = 'مباعة', customer_name = :c WHERE unit_code = :u"),
                         {"c": inst_cust, "u": inst_unit}
                     )
                     st.success(f"✅ تم توليد وحفظ خطة الأقساط للعميل {inst_cust} بنجاح!")
