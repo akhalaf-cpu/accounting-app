@@ -1129,7 +1129,7 @@ with tabs[10]:
         if st.button("🚀 توليد الكود المعدل", type="primary"):
                     if not api_key or not ai_instruction:
                      st.error("يرجى إدخال API Key والتعديل المطلوب!")
-                else:
+        else:
                     try:
                         from openai import OpenAI
                         client = OpenAI(api_key=api_key)
