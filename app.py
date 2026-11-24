@@ -1126,8 +1126,8 @@ with tabs[10]:
         api_key = st.text_input("مفتاح OpenAI API Key الخاص بك:", type="password")
         ai_instruction = st.text_area("ما التعديل أو الميزة التي ترغب في إضافتها إلى الكود؟")
 
-            if st.button("🚀 توليد الكود المعدل", type="primary"):
-                if not api_key or not ai_instruction:
+        if st.button("🚀 توليد الكود المعدل", type="primary"):
+        if not api_key or not ai_instruction:
                     st.error("يرجى إدخال API Key والتعديل المطلوب!")
                 else:
                     try:
