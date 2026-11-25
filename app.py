@@ -114,38 +114,45 @@ def send_backup_email(
     recipient_email: str,
     subject_prefix: str = "نسخة احتياطية يومية",
 ):
-    """إرسال ملف النسخة الاحتياطية (JSON + Excel) عبر البريد الإلكتروني"""
-    json_bytes, excel_bytes = build_backup_payload()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+  """إرسال ملف النسخة الاحتياطية (JSON + Excel) عبر البريد الإلكتروني"""
+  json_bytes, excel_bytes = build_backup_payload()
+  now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    msg = EmailMessage()
-    msg["Subject"] = f"{subject_prefix} - النظام المحاسبي ({now_str})"
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
-    msg.set_content(
-        f"مرحباً،\n\nمرفق النسخة الاحتياطية لقاعدة بيانات النظام المحاسبي بتاريخ: {now_str}\n\n"
-        f"- ملف JSON: نسخة كاملة مهيكلة لجميع الجداول.\n"
-        f"- ملف XLSX: جداول البيانات قابلة للفتح في Excel.\n"
-    )
+  msg = EmailMessage()
+  msg["Subject"] = f"{subject_prefix} - النظام المحاسبي ({now_str})"
+  msg["From"] = sender_email
+  msg["To"] = recipient_email
+  msg.set_content(
+      f"مرحباً،\n\nمرفق النسخة الاحتياطية لقاعدة بيانات النظام المحاسبي"
+      f" بتاريخ: {now_str}\n\n- ملف JSON: نسخة كاملة مهيكلة لجميع"
+      " الجداول.\n- ملف XLSX: جداول البيانات قابلة للفتح في Excel.\n"
+  )
 
-    msg.add_attachment(
-        json_bytes,
-        maintype="application",
-        subtype="json",
-        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-    )
-    msg.add_attachment(
-        excel_bytes,
-        maintype="application",
-        subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-    )
+  msg.add_attachment(
+      json_bytes,
+      maintype="application",
+      subtype="json",
+      filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+  )
+  msg.add_attachment(
+      excel_bytes,
+      maintype="application",
+      subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+  )
 
-    with smtplib.SMTP(smtp_server, int(smtp_port), timeout=30) as server:
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
+  clean_password = sender_password.replace(" ", "").strip()
+  port_num = int(smtp_port)
 
+  if port_num == 465:
+    with smtplib.SMTP_SSL(smtp_server.strip(), port_num, timeout=30) as server:
+      server.login(sender_email.strip(), clean_password)
+      server.send_message(msg)
+  else:
+    with smtplib.SMTP(smtp_server.strip(), port_num, timeout=30) as server:
+      server.starttls()
+      server.login(sender_email.strip(), clean_password)
+      server.send_message(msg)
 
 def get_smtp_config():
     """قراءة إعدادات البريد من st.secrets إن وجدت"""
