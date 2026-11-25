@@ -2099,7 +2099,7 @@ else:
 
 st.markdown("---")
 st.markdown("#### ✏️ تعديل قسط محدد")
-        all_inst_df = pd.read_sql(
+all_inst_df = pd.read_sql(
             """
             SELECT id, customer_name, unit_code, contract_no, installment_type,
                    due_date, amount, paid_amount, collector_name
