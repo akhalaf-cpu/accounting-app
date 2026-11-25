@@ -1,5 +1,10 @@
-from datetime import date
+from datetime import date, datetime, time as dt_time
+from email.message import EmailMessage
 import hashlib
+import io
+import json
+import smtplib
+import threading
 import pandas as pd
 from sqlalchemy import create_engine, text
 import streamlit as st
@@ -61,7 +66,270 @@ def check_hashes(password, hashed_text):
 
 
 def to_excel(df):
-    return df.to_csv(index=False).encode("utf-8-sig")
+    """تصدير ملف Excel حقيقي (.xlsx) مع fallback إلى CSV عند الحاجة"""
+    try:
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Sheet1")
+        return output.getvalue()
+    except Exception:
+        return df.to_csv(index=False).encode("utf-8-sig")
+
+
+def build_backup_payload():
+    """تجميع نسخة احتياطية كاملة من جميع جداول قاعدة البيانات بصيغتي JSON و Excel"""
+    tables = [
+        "users",
+        "accounts",
+        "projects",
+        "units",
+        "journal_entries",
+        "journal_details",
+        "installments",
+    ]
+    data_dict = {}
+    excel_buf = io.BytesIO()
+    with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
+        for tbl in tables:
+            df_tbl = pd.read_sql(f"SELECT * FROM {tbl}", engine)
+            data_dict[tbl] = df_tbl.to_dict(orient="records")
+            sheet_name = tbl[:31]
+            df_tbl.to_excel(writer, index=False, sheet_name=sheet_name)
+
+    backup_meta = {
+        "exported_at": datetime.now().isoformat(),
+        "tables": data_dict,
+    }
+    json_bytes = json.dumps(
+        backup_meta, ensure_ascii=False, indent=2, default=str
+    ).encode("utf-8")
+    return json_bytes, excel_buf.getvalue()
+
+
+def send_backup_email(
+    smtp_server: str,
+    smtp_port: int,
+    sender_email: str,
+    sender_password: str,
+    recipient_email: str,
+    subject_prefix: str = "نسخة احتياطية يومية",
+):
+    """إرسال ملف النسخة الاحتياطية (JSON + Excel) عبر البريد الإلكتروني"""
+    json_bytes, excel_bytes = build_backup_payload()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    msg = EmailMessage()
+    msg["Subject"] = f"{subject_prefix} - النظام المحاسبي ({now_str})"
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg.set_content(
+        f"مرحباً،\n\nمرفق النسخة الاحتياطية لقاعدة بيانات النظام المحاسبي بتاريخ: {now_str}\n\n"
+        f"- ملف JSON: نسخة كاملة مهيكلة لجميع الجداول.\n"
+        f"- ملف XLSX: جداول البيانات قابلة للفتح في Excel.\n"
+    )
+
+    msg.add_attachment(
+        json_bytes,
+        maintype="application",
+        subtype="json",
+        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+    )
+    msg.add_attachment(
+        excel_bytes,
+        maintype="application",
+        subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+    )
+
+    with smtplib.SMTP(smtp_server, int(smtp_port), timeout=30) as server:
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+
+
+def get_smtp_config():
+    """قراءة إعدادات البريد من st.secrets إن وجدت"""
+    sec = st.secrets.get("backup_email", {})
+    return {
+        "smtp_server": sec.get("smtp_server", "smtp.gmail.com"),
+        "smtp_port": int(sec.get("smtp_port", 587)),
+        "sender_email": sec.get("sender_email", ""),
+        "sender_password": sec.get("sender_password", ""),
+        "recipient_email": sec.get("recipient_email", ""),
+    }
+
+
+def ensure_backup_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+            CREATE TABLE IF NOT EXISTS backup_settings (
+                id INTEGER PRIMARY KEY,
+                auto_enabled INTEGER DEFAULT 0,
+                send_hour INTEGER DEFAULT 23,
+                send_minute INTEGER DEFAULT 55,
+                smtp_server TEXT DEFAULT 'smtp.gmail.com',
+                smtp_port INTEGER DEFAULT 587,
+                sender_email TEXT,
+                sender_password TEXT,
+                recipient_email TEXT,
+                last_sent_date TEXT
+            )
+        """)
+        )
+        conn.execute(
+            text(
+                "INSERT INTO backup_settings (id, auto_enabled, send_hour, send_minute) VALUES (1, 0, 23, 55) ON CONFLICT (id) DO NOTHING"
+            )
+        )
+
+
+def _daily_backup_worker():
+    """مراقب في الخلفية يرسل النسخة الاحتياطية تلقائياً في الموعد اليومي المحدد"""
+    import time as py_time
+
+    while True:
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text("""
+                        SELECT auto_enabled, send_hour, send_minute, smtp_server, smtp_port,
+                               sender_email, sender_password, recipient_email, last_sent_date
+                        FROM backup_settings WHERE id = 1
+                    """)
+                ).fetchone()
+
+            if row and row[0] == 1:
+                now = datetime.now()
+                today_str = now.strftime("%Y-%m-%d")
+                target_reached = (now.hour > int(row[1])) or (
+                    now.hour == int(row[1]) and now.minute >= int(row[2])
+                )
+                if target_reached and row[8] != today_str:
+                    s_email = row[5] or ""
+                    s_pass = row[6] or ""
+                    r_email = row[7] or ""
+                    if s_email and s_pass and r_email:
+                        send_backup_email(
+                            smtp_server=row[3] or "smtp.gmail.com",
+                            smtp_port=int(row[4] or 587),
+                            sender_email=s_email,
+                            sender_password=s_pass,
+                            recipient_email=r_email,
+                            subject_prefix="نسخة احتياطية تلقائية نهاية اليوم",
+                        )
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "UPDATE backup_settings SET last_sent_date = :d WHERE id = 1"
+                                ),
+                                {"d": today_str},
+                            )
+        except Exception:
+            pass
+        py_time.sleep(60)
+
+
+@st.cache_resource
+def start_backup_scheduler():
+    t = threading.Thread(target=_daily_backup_worker, daemon=True)
+    t.start()
+    return True
+
+
+def import_accounts_from_df(df_upload: pd.DataFrame):
+    """استيراد حسابات إلى جدول accounts من ملف Excel أو CSV"""
+    # توحيد أسماء الأعمدة الشائعة بالعربية والإنجليزية
+    col_map = {
+        "كود الحساب": "code",
+        "الكود": "code",
+        "code": "code",
+        "اسم الحساب": "name",
+        "الاسم": "name",
+        "name": "name",
+        "نوع الحساب": "account_type",
+        "النوع": "account_type",
+        "account_type": "account_type",
+        "كود الحساب الأب": "parent_code",
+        "parent_code": "parent_code",
+        "parent_id": "parent_id",
+        "allow_posting": "allow_posting",
+        "طبيعة التسجيل": "allow_posting",
+    }
+    renamed = df_upload.rename(
+        columns={c: col_map.get(str(c).strip(), str(c).strip()) for c in df_upload.columns}
+    )
+
+    if not {"code", "name", "account_type"}.issubset(set(renamed.columns)):
+        return (
+            0,
+            0,
+            "الملف يجب أن يحتوي على الأعمدة التالية على الأقل: code (أو كود الحساب), name (أو اسم الحساب), account_type (أو نوع الحساب).",
+        )
+
+    added = 0
+    skipped = 0
+
+    with engine.begin() as conn:
+        existing_rows = conn.execute(
+            text("SELECT id, code FROM accounts WHERE code IS NOT NULL")
+        ).fetchall()
+        code_to_id = {str(r[1]).strip(): int(r[0]) for r in existing_rows}
+
+        for _, r in renamed.iterrows():
+            raw_code = r.get("code")
+            raw_name = r.get("name")
+            raw_type = r.get("account_type")
+            if pd.isna(raw_code) or pd.isna(raw_name) or pd.isna(raw_type):
+                skipped += 1
+                continue
+
+            acc_code = str(raw_code).strip()
+            acc_name = str(raw_name).strip()
+            acc_type = str(raw_type).strip()
+
+            if not acc_code or not acc_name or acc_type not in TYPES:
+                skipped += 1
+                continue
+
+            if acc_code in code_to_id:
+                skipped += 1
+                continue
+
+            parent_id = None
+            if "parent_code" in renamed.columns and pd.notna(r.get("parent_code")):
+                p_code = str(r.get("parent_code")).strip()
+                parent_id = code_to_id.get(p_code)
+            elif "parent_id" in renamed.columns and pd.notna(r.get("parent_id")):
+                try:
+                    parent_id = int(r.get("parent_id"))
+                except Exception:
+                    parent_id = None
+
+            allow_val = 1
+            if "allow_posting" in renamed.columns and pd.notna(r.get("allow_posting")):
+                val_str = str(r.get("allow_posting")).strip()
+                if val_str in ["0", "ممنوع", "ممنوع التسجيل (رئيسي)", "False", "false"]:
+                    allow_val = 0
+
+            new_id = conn.execute(
+                text("""
+                    INSERT INTO accounts (code, name, account_type, parent_id, allow_posting)
+                    VALUES (:c, :n, :t, :p, :a)
+                    RETURNING id
+                """),
+                {
+                    "c": acc_code,
+                    "n": acc_name,
+                    "t": acc_type,
+                    "p": parent_id,
+                    "a": allow_val,
+                },
+            ).scalar()
+            code_to_id[acc_code] = int(new_id)
+            added += 1
+
+    return added, skipped, None
 
 
 def generate_entry_html(
@@ -251,6 +519,7 @@ def init_db():
                     "r": "مدير النظام",
                 },
             )
+    ensure_backup_table()
 
 
 def load_default_accounts():
@@ -276,6 +545,7 @@ st.set_page_config(page_title="برنامجي المحاسبي السحابي", 
 
 if "db_initialized" not in st.session_state:
     init_db()
+    start_backup_scheduler()
     st.session_state["db_initialized"] = True
 
 if "logged_in" not in st.session_state:
@@ -339,16 +609,64 @@ else:
     if is_admin:
         tabs_list.append("👥 إدارة المستخدمين")
         tabs_list.append("🤖 الـ AI وتحديث الكود")
+        tabs_list.append("💾 النسخ الاحتياطي")
 
     tabs = st.tabs(tabs_list)
 
     # --- 1. شجرة الحسابات ---
     with tabs[0]:
         st.subheader("🌳 إدارة وتأسيس شجرة الحسابات")
-        if st.button("⚡ انشاء شجرة حسابات قياسية كاملاً", type="primary"):
-            load_default_accounts()
-            st.success("✅ تم بناء شجرة الحسابات القياسية بنجاح!")
-            st.rerun()
+        col_top_b1, col_top_b2 = st.columns([1, 2])
+        with col_top_b1:
+            if st.button("⚡ انشاء شجرة حسابات قياسية كاملاً", type="primary"):
+                load_default_accounts()
+                st.success("✅ تم بناء شجرة الحسابات القياسية بنجاح!")
+                st.rerun()
+
+        with st.expander("📥 استيراد شجرة حسابات من ملف Excel / CSV"):
+            st.caption(
+                "الأعمدة المطلوبة: `code` (أو كود الحساب)، `name` (أو اسم الحساب)، `account_type` (أصول / خصوم / حقوق ملكية / إيرادات / مصروفات). اختياري: `parent_code`."
+            )
+            template_df = pd.DataFrame(
+                [
+                    {
+                        "code": "118",
+                        "name": "مقاولون تحت الحساب",
+                        "account_type": "أصول",
+                        "parent_code": "11",
+                        "allow_posting": 1,
+                    }
+                ]
+            )
+            st.download_button(
+                label="📄 تحميل نموذج Excel جاهز للتعبئة",
+                data=to_excel(template_df),
+                file_name="chart_of_accounts_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            uploaded_coa = st.file_uploader(
+                "اختر ملف شجرة الحسابات (.xlsx, .xls, .csv)",
+                type=["xlsx", "xls", "csv"],
+                key="coa_upload",
+            )
+            if uploaded_coa is not None:
+                try:
+                    if uploaded_coa.name.lower().endswith(".csv"):
+                        up_df = pd.read_csv(uploaded_coa)
+                    else:
+                        up_df = pd.read_excel(uploaded_coa)
+                    st.dataframe(up_df.head(10), use_container_width=True)
+                    if st.button("🚀 تنفيذ استيراد الحسابات للملف", type="primary"):
+                        added_cnt, skipped_cnt, err_msg = import_accounts_from_df(up_df)
+                        if err_msg:
+                            st.error(f"❌ {err_msg}")
+                        else:
+                            st.success(
+                                f"✅ تم استيراد {added_cnt} حساب جديد، وتم تخطي {skipped_cnt} صف (مكرر أو غير مكتمل)."
+                            )
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"❌ تعذر قراءة الملف: {str(e)}")
 
         st.markdown("---")
         col_acc1, col_acc2 = st.columns(2)
@@ -508,6 +826,12 @@ else:
 
         if not df_acc.empty:
             st.dataframe(df_acc, use_container_width=True)
+            st.download_button(
+                label="📥 تصدير شجرة الحسابات إلى Excel",
+                data=to_excel(df_acc),
+                file_name="chart_of_accounts.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
     # --- 2. الأرصدة الافتتاحية ---
     with tabs[1]:
@@ -745,8 +1069,8 @@ else:
             st.download_button(
                 label="📥 تصدير دفتر اليومية إلى Excel",
                 data=excel_journal,
-                file_name="journal_entries.csv",
-                mime="text/csv",
+                file_name="journal_entries.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
             st.markdown("---")
@@ -865,8 +1189,8 @@ else:
             st.download_button(
                 label="📥 تصدير ميزان المراجعة إلى Excel",
                 data=excel_tb,
-                file_name="trial_balance.csv",
-                mime="text/csv",
+                file_name="trial_balance.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
     # --- 6. كشف حساب ---
@@ -923,10 +1247,10 @@ else:
                     st.info(f"💡 **الرصيد الحالي:** {final_balance:,.2f}")
                     excel_ledger = to_excel(ledger_df)
                     st.download_button(
-                        label="📥 تصدير كشف الحساب",
+                        label="📥 تصدير كشف الحساب إلى Excel",
                         data=excel_ledger,
-                        file_name=f"ledger_{selected_account}.csv",
-                        mime="text/csv",
+                        file_name=f"ledger_{selected_account}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     )
 
     # --- 7. قائمة الدخل ---
@@ -1624,8 +1948,8 @@ else:
                 st.download_button(
                     label=f"📥 تصدير كشف حساب العميل ({chosen_cust}) إلى Excel",
                     data=to_excel(stmt_view),
-                    file_name=f"statement_{chosen_cust}.csv",
-                    mime="text/csv",
+                    file_name=f"statement_{chosen_cust}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
     # --- 11. إدارة المستخدمين ---
@@ -1776,3 +2100,136 @@ else:
                         st.code(new_code.strip(), language="python")
                     except Exception as e:
                         st.error(f"❌ حدث خطأ: {str(e)}")
+
+        # --- 13. النسخ الاحتياطي التلقائي عبر البريد الإلكتروني ---
+        with tabs[12]:
+            st.subheader("💾 النسخ الاحتياطي وإرساله عبر البريد الإلكتروني")
+            st.info(
+                "يتم حفظ إعدادات الإرسال اليومي في قاعدة البيانات، ويُرسل ملف النسخة الاحتياطية (JSON + Excel) تلقائياً في الموعد اليومي المحدد (مثل نهاية اليوم 23:55) طالما التطبيق نشط."
+            )
+
+            sec_cfg = get_smtp_config()
+            with engine.connect() as conn:
+                cfg_row = conn.execute(
+                    text("""
+                        SELECT auto_enabled, send_hour, send_minute, smtp_server, smtp_port,
+                               sender_email, sender_password, recipient_email, last_sent_date
+                        FROM backup_settings WHERE id = 1
+                    """)
+                ).fetchone()
+
+            cur_auto = bool(cfg_row[0] == 1) if cfg_row else False
+            cur_hour = int(cfg_row[1]) if cfg_row and cfg_row[1] is not None else 23
+            cur_min = int(cfg_row[2]) if cfg_row and cfg_row[2] is not None else 55
+            cur_server = (cfg_row[3] if cfg_row and cfg_row[3] else sec_cfg["smtp_server"])
+            cur_port = int(cfg_row[4]) if cfg_row and cfg_row[4] else sec_cfg["smtp_port"]
+            cur_sender = (cfg_row[5] if cfg_row and cfg_row[5] else sec_cfg["sender_email"])
+            cur_pass = (cfg_row[6] if cfg_row and cfg_row[6] else sec_cfg["sender_password"])
+            cur_rec = (cfg_row[7] if cfg_row and cfg_row[7] else sec_cfg["recipient_email"])
+            last_sent = cfg_row[8] if cfg_row and cfg_row[8] else "لم يتم الإرسال بعد"
+
+            st.caption(f"آخر إرسال تلقائي ناجح: **{last_sent}**")
+
+            with st.form("backup_email_settings_form"):
+                auto_enabled = st.checkbox(
+                    "⏰ تفعيل الإرسال التلقائي اليومي في نهاية اليوم",
+                    value=cur_auto,
+                )
+                col_tm1, col_tm2 = st.columns(2)
+                send_time_val = col_tm1.time_input(
+                    "موعد الإرسال اليومي",
+                    value=dt_time(hour=cur_hour, minute=cur_min),
+                )
+                smtp_port_val = col_tm2.number_input(
+                    "منفذ SMTP Port",
+                    min_value=1,
+                    max_value=65535,
+                    value=cur_port,
+                )
+
+                smtp_server_val = st.text_input(
+                    "خادم SMTP Server", value=cur_server
+                )
+                col_em1, col_em2 = st.columns(2)
+                sender_email_val = col_em1.text_input(
+                    "البريد المرسل منه (Sender Email)", value=cur_sender
+                )
+                sender_pass_val = col_em2.text_input(
+                    "كلمة مرور التطبيقات (App Password)",
+                    value=cur_pass,
+                    type="password",
+                )
+                recipient_email_val = st.text_input(
+                    "البريد المستلم للنسخة الاحتياطية (Recipient Email)",
+                    value=cur_rec,
+                )
+
+                save_bkp_cfg = st.form_submit_button(
+                    "💾 حفظ إعدادات النسخ الاحتياطي", type="primary"
+                )
+                if save_bkp_cfg:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("""
+                                UPDATE backup_settings
+                                SET auto_enabled = :ae,
+                                    send_hour = :sh,
+                                    send_minute = :sm,
+                                    smtp_server = :srv,
+                                    smtp_port = :prt,
+                                    sender_email = :se,
+                                    sender_password = :sp,
+                                    recipient_email = :re
+                                WHERE id = 1
+                            """),
+                            {
+                                "ae": 1 if auto_enabled else 0,
+                                "sh": int(send_time_val.hour),
+                                "sm": int(send_time_val.minute),
+                                "srv": smtp_server_val.strip(),
+                                "prt": int(smtp_port_val),
+                                "se": sender_email_val.strip(),
+                                "sp": sender_pass_val,
+                                "re": recipient_email_val.strip(),
+                            },
+                        )
+                    st.success("✅ تم حفظ إعدادات النسخ الاحتياطي بنجاح!")
+                    st.rerun()
+
+            st.markdown("---")
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                if st.button("📧 إرسال نسخة احتياطية الآن عبر الإيميل"):
+                    if not sender_email_val or not sender_pass_val or not recipient_email_val:
+                        st.error("يرجى إدخال البريد المرسل وكلمة المرور والبريد المستلم أولاً.")
+                    else:
+                        try:
+                            with st.spinner("جارٍ إنشاء وإرسال النسخة الاحتياطية..."):
+                                send_backup_email(
+                                    smtp_server=smtp_server_val.strip(),
+                                    smtp_port=int(smtp_port_val),
+                                    sender_email=sender_email_val.strip(),
+                                    sender_password=sender_pass_val,
+                                    recipient_email=recipient_email_val.strip(),
+                                    subject_prefix="نسخة احتياطية يدوية",
+                                )
+                            st.success(
+                                f"✅ تم إرسال النسخة الاحتياطية إلى {recipient_email_val.strip()} بنجاح!"
+                            )
+                        except Exception as e:
+                            st.error(f"❌ فشل إرسال البريد: {str(e)}")
+
+            with col_act2:
+                json_bkp, excel_bkp = build_backup_payload()
+                st.download_button(
+                    label="⬇️ تحميل نسخة احتياطية فورية (Excel)",
+                    data=excel_bkp,
+                    file_name=f"full_backup_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                st.download_button(
+                    label="⬇️ تحميل نسخة احتياطية فورية (JSON)",
+                    data=json_bkp,
+                    file_name=f"full_backup_{date.today()}.json",
+                    mime="application/json",
+                )
