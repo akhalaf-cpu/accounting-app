@@ -114,45 +114,46 @@ def send_backup_email(
     recipient_email: str,
     subject_prefix: str = "نسخة احتياطية يومية",
 ):
-  """إرسال ملف النسخة الاحتياطية (JSON + Excel) عبر البريد الإلكتروني"""
-  json_bytes, excel_bytes = build_backup_payload()
-  now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    """إرسال ملف النسخة الاحتياطية (JSON + Excel) عبر البريد الإلكتروني"""
+    json_bytes, excel_bytes = build_backup_payload()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-  msg = EmailMessage()
-  msg["Subject"] = f"{subject_prefix} - النظام المحاسبي ({now_str})"
-  msg["From"] = sender_email
-  msg["To"] = recipient_email
-  msg.set_content(
-      f"مرحباً،\n\nمرفق النسخة الاحتياطية لقاعدة بيانات النظام المحاسبي"
-      f" بتاريخ: {now_str}\n\n- ملف JSON: نسخة كاملة مهيكلة لجميع"
-      " الجداول.\n- ملف XLSX: جداول البيانات قابلة للفتح في Excel.\n"
-  )
+    msg = EmailMessage()
+    msg["Subject"] = f"{subject_prefix} - النظام المحاسبي ({now_str})"
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg.set_content(
+        f"مرحباً،\n\nمرفق النسخة الاحتياطية لقاعدة بيانات النظام المحاسبي"
+        f" بتاريخ: {now_str}\n\n- ملف JSON: نسخة كاملة مهيكلة لجميع"
+        " الجداول.\n- ملف XLSX: جداول البيانات قابلة للفتح في Excel.\n"
+    )
 
-  msg.add_attachment(
-      json_bytes,
-      maintype="application",
-      subtype="json",
-      filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-  )
-  msg.add_attachment(
-      excel_bytes,
-      maintype="application",
-      subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-  )
+    msg.add_attachment(
+        json_bytes,
+        maintype="application",
+        subtype="json",
+        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+    )
+    msg.add_attachment(
+        excel_bytes,
+        maintype="application",
+        subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"accounting_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+    )
 
-  clean_password = sender_password.replace(" ", "").strip()
-  port_num = int(smtp_port)
+    clean_password = sender_password.replace(" ", "").strip()
+    port_num = int(smtp_port)
 
-  if port_num == 465:
-    with smtplib.SMTP_SSL(smtp_server.strip(), port_num, timeout=30) as server:
-      server.login(sender_email.strip(), clean_password)
-      server.send_message(msg)
-  else:
-    with smtplib.SMTP(smtp_server.strip(), port_num, timeout=30) as server:
-      server.starttls()
-      server.login(sender_email.strip(), clean_password)
-      server.send_message(msg)
+    if port_num == 465:
+        with smtplib.SMTP_SSL(smtp_server.strip(), port_num, timeout=30) as server:
+            server.login(sender_email.strip(), clean_password)
+            server.send_message(msg)
+    else:
+        with smtplib.SMTP(smtp_server.strip(), port_num, timeout=30) as server:
+            server.starttls()
+            server.login(sender_email.strip(), clean_password)
+            server.send_message(msg)
+
 
 def get_smtp_config():
     """قراءة إعدادات البريد من st.secrets إن وجدت"""
@@ -246,7 +247,6 @@ def start_backup_scheduler():
 
 def import_accounts_from_df(df_upload: pd.DataFrame):
     """استيراد حسابات إلى جدول accounts من ملف Excel أو CSV"""
-    # توحيد أسماء الأعمدة الشائعة بالعربية والإنجليزية
     col_map = {
         "كود الحساب": "code",
         "الكود": "code",
@@ -1409,7 +1409,7 @@ else:
             diff = total_assets - total_liab_eq
             st.error(f"❌ الفرق: {diff:,.2f}")
 
- # --- 9. المشاريع والوحدات العقارية ---
+    # --- 9. المشاريع والوحدات العقارية ---
     with tabs[8]:
         st.subheader("🏗️ إدارة المشاريع العقارية والوحدات")
         proj_sub1, proj_sub2, proj_sub3 = st.tabs([
@@ -2097,207 +2097,208 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
-st.markdown("---")
-st.markdown("#### ✏️ تعديل قسط محدد")
-all_inst_df = pd.read_sql(
-            """
-            SELECT id, customer_name, unit_code, contract_no, installment_type,
-                   due_date, amount, paid_amount, collector_name
-            FROM installments
-            ORDER BY id DESC
-        """,
-            engine,
-        )
-
-if not all_inst_df.empty:
-          inst_edit_options = {
-              (
-                  f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
-                  f" {r['installment_type']} | استحقاق: {r['due_date']} |"
-                  f" قيمة: {float(r['amount'] or 0):,.2f}"
-              ): int(r["id"])
-              for _, r in all_inst_df.iterrows()
-          }
-          sel_inst_label = st.selectbox(
-              "اختر القسط للتعديل:",
-              list(inst_edit_options.keys()),
-              key="edit_inst_sel",
-          )
-          target_inst_id = inst_edit_options[sel_inst_label]
-          target_inst_row = all_inst_df[
-              all_inst_df["id"] == target_inst_id
-          ].iloc[0]
-
-          with st.form("edit_installment_form"):
-            ic1, ic2, ic3, ic4 = st.columns(4)
-            upd_cust = ic1.text_input(
-                "اسم العميل", value=target_inst_row["customer_name"] or ""
-            )
-            upd_unit = ic2.text_input(
-                "كود الوحدة", value=target_inst_row["unit_code"] or ""
-            )
-            upd_contract = ic3.text_input(
-                "رقم العقد", value=target_inst_row["contract_no"] or ""
-            )
-            inst_types = ["Down Payment", "Regular"]
-            curr_type_i = (
-                inst_types.index(target_inst_row["installment_type"])
-                if target_inst_row["installment_type"] in inst_types
-                else 1
-            )
-            upd_inst_type = ic4.selectbox(
-                "نوع القسط", inst_types, index=curr_type_i
+            st.markdown("---")
+            st.markdown("#### ✏️ تعديل قسط محدد")
+            all_inst_df = pd.read_sql(
+                """
+                SELECT id, customer_name, unit_code, contract_no, installment_type,
+                       due_date, amount, paid_amount, collector_name
+                FROM installments
+                ORDER BY id DESC
+            """,
+                engine,
             )
 
-            ic5, ic6, ic7, ic8 = st.columns(4)
-            try:
-              parsed_due = date.fromisoformat(
-                  str(target_inst_row["due_date"])[:10]
-              )
-            except Exception:
-              parsed_due = date.today()
-            upd_due_date = ic5.date_input("تاريخ الاستحقاق", value=parsed_due)
-            upd_amount = ic6.number_input(
-                "قيمة القسط",
-                min_value=0.0,
-                value=float(target_inst_row["amount"] or 0.0),
-                step=500.0,
-            )
-            upd_paid = ic7.number_input(
-                "المبلغ المسدد",
-                min_value=0.0,
-                value=float(target_inst_row["paid_amount"] or 0.0),
-                step=500.0,
-            )
-            upd_collector = ic8.text_input(
-                "مسؤول التحصيل",
-                value=target_inst_row["collector_name"] or "",
-            )
-
-            save_inst_btn = st.form_submit_button(
-                "💾 حفظ تعديل القسط", type="primary"
-            )
-
-            if save_inst_btn:
-              if not upd_cust.strip() or not upd_unit.strip():
-                st.error("يرجى إدخال اسم العميل وكود الوحدة!")
-              else:
-                calc_status = (
-                    "Paid"
-                    if upd_paid >= upd_amount - 0.01 and upd_amount > 0
-                    else ("Partially Paid" if upd_paid > 0 else "Unpaid")
+            if not all_inst_df.empty:
+                inst_edit_options = {
+                    (
+                        f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
+                        f" {r['installment_type']} | استحقاق: {r['due_date']} |"
+                        f" قيمة: {float(r['amount'] or 0):,.2f}"
+                    ): int(r["id"])
+                    for _, r in all_inst_df.iterrows()
+                }
+                sel_inst_label = st.selectbox(
+                    "اختر القسط للتعديل:",
+                    list(inst_edit_options.keys()),
+                    key="edit_inst_sel",
                 )
-                with engine.begin() as conn:
-                  conn.execute(
-                      text("""
-                                    UPDATE installments
-                                    SET customer_name = :c,
-                                        unit_code = :u,
-                                        contract_no = :cn,
-                                        installment_type = :it,
-                                        due_date = :dd,
-                                        amount = :amt,
-                                        paid_amount = :pa,
-                                        collector_name = :col,
-                                        status = :st
-                                    WHERE id = :id
-                                """),
-                      {
-                          "c": upd_cust.strip(),
-                          "u": upd_unit.strip(),
-                          "cn": upd_contract.strip(),
-                          "it": upd_inst_type,
-                          "dd": str(upd_due_date),
-                          "amt": float(upd_amount),
-                          "pa": float(upd_paid),
-                          "col": upd_collector.strip(),
-                          "st": calc_status,
-                          "id": int(target_inst_id),
-                      },
-                  )
-                st.success(f"✅ تم تحديث القسط رقم #{target_inst_id} بنجاح!")
-                st.rerun()
-else:
-          st.info("لا توجد أقساط مسجلة حالياً للتعديل.")
+                target_inst_id = inst_edit_options[sel_inst_label]
+                target_inst_row = all_inst_df[
+                    all_inst_df["id"] == target_inst_id
+                ].iloc[0]
 
-st.markdown("---")
-st.markdown("#### 🗑️ حذف قسط واحد أو عدة أقساط دفعة واحدة")
-all_inst_del_df = pd.read_sql(
-            """
-            SELECT id, project_name, customer_name, unit_code, contract_no,
-                   installment_type, due_date, amount, paid_amount, status
-            FROM installments
-            ORDER BY due_date ASC, id ASC
-        """,
-            engine,
-        )
+                with st.form("edit_installment_form"):
+                    ic1, ic2, ic3, ic4 = st.columns(4)
+                    upd_cust = ic1.text_input(
+                        "اسم العميل", value=target_inst_row["customer_name"] or ""
+                    )
+                    upd_unit = ic2.text_input(
+                        "كود الوحدة", value=target_inst_row["unit_code"] or ""
+                    )
+                    upd_contract = ic3.text_input(
+                        "رقم العقد", value=target_inst_row["contract_no"] or ""
+                    )
+                    inst_types = ["Down Payment", "Regular"]
+                    curr_type_i = (
+                        inst_types.index(target_inst_row["installment_type"])
+                        if target_inst_row["installment_type"] in inst_types
+                        else 1
+                    )
+                    upd_inst_type = ic4.selectbox(
+                        "نوع القسط", inst_types, index=curr_type_i
+                    )
 
-if not all_inst_del_df.empty:
-          multi_inst_map = {
-              (
-                  f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
-                  f" {r['installment_type']} | استحقاق: {r['due_date']} |"
-                  f" قيمة: {float(r['amount'] or 0):,.2f} | الحالة:"
-                  f" {r['status']}"
-              ): int(r["id"])
-              for _, r in all_inst_del_df.iterrows()
-          }
+                    ic5, ic6, ic7, ic8 = st.columns(4)
+                    try:
+                        parsed_due = date.fromisoformat(
+                            str(target_inst_row["due_date"])[:10]
+                        )
+                    except Exception:
+                        parsed_due = date.today()
+                    upd_due_date = ic5.date_input("تاريخ الاستحقاق", value=parsed_due)
+                    upd_amount = ic6.number_input(
+                        "قيمة القسط",
+                        min_value=0.0,
+                        value=float(target_inst_row["amount"] or 0.0),
+                        step=500.0,
+                    )
+                    upd_paid = ic7.number_input(
+                        "المبلغ المسدد",
+                        min_value=0.0,
+                        value=float(target_inst_row["paid_amount"] or 0.0),
+                        step=500.0,
+                    )
+                    upd_collector = ic8.text_input(
+                        "مسؤول التحصيل",
+                        value=target_inst_row["collector_name"] or "",
+                    )
 
-          selected_inst_labels = st.multiselect(
-              "اختر الأقساط المطلوب حذفها (يمكنك تحديد أكثر من قسط):",
-              options=list(multi_inst_map.keys()),
-              key="multi_delete_inst_sel",
-          )
+                    save_inst_btn = st.form_submit_button(
+                        "💾 حفظ تعديل القسط", type="primary"
+                    )
 
-          if selected_inst_labels:
-            selected_ids = [
-                int(multi_inst_map[lbl]) for lbl in selected_inst_labels
-            ]
-            selected_rows_df = all_inst_del_df[
-                all_inst_del_df["id"].isin(selected_ids)
-            ]
-            total_del_amt = float(selected_rows_df["amount"].sum())
+                    if save_inst_btn:
+                        if not upd_cust.strip() or not upd_unit.strip():
+                            st.error("يرجى إدخال اسم العميل وكود الوحدة!")
+                        else:
+                            calc_status = (
+                                "Paid"
+                                if upd_paid >= upd_amount - 0.01 and upd_amount > 0
+                                else ("Partially Paid" if upd_paid > 0 else "Unpaid")
+                            )
+                            with engine.begin() as conn:
+                                conn.execute(
+                                    text("""
+                                        UPDATE installments
+                                        SET customer_name = :c,
+                                            unit_code = :u,
+                                            contract_no = :cn,
+                                            installment_type = :it,
+                                            due_date = :dd,
+                                            amount = :amt,
+                                            paid_amount = :pa,
+                                            collector_name = :col,
+                                            status = :st
+                                        WHERE id = :id
+                                    """),
+                                    {
+                                        "c": upd_cust.strip(),
+                                        "u": upd_unit.strip(),
+                                        "cn": upd_contract.strip(),
+                                        "it": upd_inst_type,
+                                        "dd": str(upd_due_date),
+                                        "amt": float(upd_amount),
+                                        "pa": float(upd_paid),
+                                        "col": upd_collector.strip(),
+                                        "st": calc_status,
+                                        "id": int(target_inst_id),
+                                    },
+                                )
+                            st.success(f"✅ تم تحديث القسط رقم #{target_inst_id} بنجاح!")
+                            st.rerun()
+            else:
+                st.info("لا توجد أقساط مسجلة حالياً للتعديل.")
 
-            st.warning(
-                f"تم تحديد **{len(selected_ids)}** قسط بإجمالي قيمة"
-                f" **{total_del_amt:,.2f}**."
+            st.markdown("---")
+            st.markdown("#### 🗑️ حذف قسط واحد أو عدة أقساط دفعة واحدة")
+            all_inst_del_df = pd.read_sql(
+                """
+                SELECT id, project_name, customer_name, unit_code, contract_no,
+                       installment_type, due_date, amount, paid_amount, status
+                FROM installments
+                ORDER BY due_date ASC, id ASC
+            """,
+                engine,
             )
-            st.dataframe(
-                selected_rows_df[[
-                    "id",
-                    "customer_name",
-                    "unit_code",
-                    "installment_type",
-                    "due_date",
-                    "amount",
-                    "paid_amount",
-                    "status",
-                ]],
-                use_container_width=True,
-                hide_index=True,
-            )
 
-            confirm_bulk_del = st.checkbox(
-                "أؤكد رغبتي في حذف الأقساط المحددة نهائياً من قاعدة البيانات",
-                key="confirm_bulk_inst_del",
-            )
+            if not all_inst_del_df.empty:
+                multi_inst_map = {
+                    (
+                        f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
+                        f" {r['installment_type']} | استحقاق: {r['due_date']} |"
+                        f" قيمة: {float(r['amount'] or 0):,.2f} | الحالة:"
+                        f" {r['status']}"
+                    ): int(r["id"])
+                    for _, r in all_inst_del_df.iterrows()
+                }
 
-            if st.button(
-                f"🗑️ حذف ({len(selected_ids)}) قسط محدد",
-                type="primary",
-                disabled=not confirm_bulk_del,
-                key="btn_bulk_delete_inst",
-            ):
-              with engine.begin() as conn:
-                for inst_id in selected_ids:
-                  conn.execute(
-                      text("DELETE FROM installments WHERE id = :id"),
-                      {"id": inst_id},
-                  )
-                st.success(f"✅ تم حذف {len(selected_ids)} قسط بنجاح!")
-                st.rerun()
-    else:
-    st.info("لا توجد أقساط مسجلة حالياً للحذف.")
+                selected_inst_labels = st.multiselect(
+                    "اختر الأقساط المطلوب حذفها (يمكنك تحديد أكثر من قسط):",
+                    options=list(multi_inst_map.keys()),
+                    key="multi_delete_inst_sel",
+                )
+
+                if selected_inst_labels:
+                    selected_ids = [
+                        int(multi_inst_map[lbl]) for lbl in selected_inst_labels
+                    ]
+                    selected_rows_df = all_inst_del_df[
+                        all_inst_del_df["id"].isin(selected_ids)
+                    ]
+                    total_del_amt = float(selected_rows_df["amount"].sum())
+
+                    st.warning(
+                        f"تم تحديد **{len(selected_ids)}** قسط بإجمالي قيمة"
+                        f" **{total_del_amt:,.2f}**."
+                    )
+                    st.dataframe(
+                        selected_rows_df[[
+                            "id",
+                            "customer_name",
+                            "unit_code",
+                            "installment_type",
+                            "due_date",
+                            "amount",
+                            "paid_amount",
+                            "status",
+                        ]],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    confirm_bulk_del = st.checkbox(
+                        "أؤكد رغبتي في حذف الأقساط المحددة نهائياً من قاعدة البيانات",
+                        key="confirm_bulk_inst_del",
+                    )
+
+                    if st.button(
+                        f"🗑️ حذف ({len(selected_ids)}) قسط محدد",
+                        type="primary",
+                        disabled=not confirm_bulk_del,
+                        key="btn_bulk_delete_inst",
+                    ):
+                        with engine.begin() as conn:
+                            for inst_id in selected_ids:
+                                conn.execute(
+                                    text("DELETE FROM installments WHERE id = :id"),
+                                    {"id": inst_id},
+                                )
+                        st.success(f"✅ تم حذف {len(selected_ids)} قسط بنجاح!")
+                        st.rerun()
+            else:
+                st.info("لا توجد أقساط مسجلة حالياً للحذف.")
+
     # --- 11. إدارة المستخدمين ---
     if is_admin:
         with tabs[10]:
