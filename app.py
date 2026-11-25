@@ -2229,7 +2229,7 @@ if not all_inst_df.empty:
             )
           st.success(f"✅ تم حذف القسط رقم #{target_inst_id} بنجاح!")
           st.rerun()
-    else:
+else:
       st.info("لا توجد أقساط مسجلة حالياً.")
         # --- 11. إدارة المستخدمين ---
     if is_admin:
