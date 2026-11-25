@@ -2113,7 +2113,7 @@ all_inst_df = pd.read_sql(
         engine,
     )
 
-    if not all_inst_df.empty:
+if not all_inst_df.empty:
       inst_edit_options = {
           (
               f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
