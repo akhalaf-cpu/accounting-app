@@ -1778,10 +1778,9 @@ else:
                     proj_details_df, use_container_width=True, hide_index=True
                 )
 
-    # --- 10. نظام أقساط العملاء ---
+# --- 10. نظام أقساط العملاء ---
     with tabs[9]:
-        st.subheader("📅 إدارة ومتابعة أقساط العملاء")
-
+      st.subheader("🗓️ إدارة ومتابعة أقساط العملاء")[cite: 16]
         with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
             with st.form("generate_installments_form"):
                 c1, c2, c3, c4 = st.columns(4)
