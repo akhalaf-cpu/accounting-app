@@ -1902,7 +1902,7 @@ with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل"
                         )
                         st.rerun()
 
-        df_inst = pd.read_sql(
+df_inst = pd.read_sql(
             "SELECT * FROM installments ORDER BY due_date ASC, id ASC", engine
         )
         if df_inst.empty:
