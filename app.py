@@ -1768,7 +1768,7 @@ else:
   c_p1.metric("إيرادات المشروع", f"{tot_rev:,.2f}")
   c_p2.metric("مصروفات وتكاليف المشروع", f"{tot_exp:,.2f}")
   c_p3.metric("صافي ربح المشروع", f"{(tot_rev - tot_exp):,.2f}")
-                st.dataframe(
+  st.dataframe(
                     proj_details_df, use_container_width=True, hide_index=True
                 )
 
