@@ -2217,7 +2217,7 @@ if not all_inst_df.empty:
                   )
                 st.success(f"✅ تم تحديث القسط رقم #{target_inst_id} بنجاح!")
                 st.rerun()
-        else:
+else:
           st.info("لا توجد أقساط مسجلة حالياً للتعديل.")
 
         st.markdown("---")
