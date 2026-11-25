@@ -1770,7 +1770,7 @@ if not all_projs_edit.empty:
         st.rerun()
 else:
   st.info("لا توجد مشاريع إضافية قابلة للتعديل أو الحذف حالياً.")
-    c_p1, c_p2, c_p3 = st.columns(3)
+  c_p1, c_p2, c_p3 = st.columns(3)
   c_p1.metric("إيرادات المشروع", f"{tot_rev:,.2f}")
   c_p2.metric("مصروفات وتكاليف المشروع", f"{tot_exp:,.2f}")
   c_p3.metric("صافي ربح المشروع", f"{(tot_rev - tot_exp):,.2f}")
