@@ -1781,8 +1781,8 @@ else:
 # --- 10. نظام أقساط العملاء ---
 with tabs[9]:
       st.subheader("🗓️ إدارة ومتابعة أقساط العملاء")
-        with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
-            with st.form("generate_installments_form"):
+with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
+with st.form("generate_installments_form"):
                 c1, c2, c3, c4 = st.columns(4)
                 proj_list = pd.read_sql("SELECT name FROM projects", engine)[
                     "name"
