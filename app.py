@@ -1779,7 +1779,7 @@ else:
                 )
 
     # --- 10. نظام أقساط العملاء ---
-    with tabs[9]:
+     with tabs[9]:
         st.subheader("📅 إدارة ومتابعة أقساط العملاء")
 
         with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
