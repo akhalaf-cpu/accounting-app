@@ -2232,7 +2232,7 @@ all_inst_del_df = pd.read_sql(
             engine,
         )
 
-        if not all_inst_del_df.empty:
+if not all_inst_del_df.empty:
           multi_inst_map = {
               (
                   f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
