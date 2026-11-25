@@ -339,6 +339,309 @@ def import_accounts_from_df(df_upload: pd.DataFrame):
     return added, skipped, None
 
 
+def import_opening_balances_from_df(df_upload: pd.DataFrame, default_date: date):
+    """استيراد الأرصدة الافتتاحية من ملف Excel أو CSV إلى قيود اليومية"""
+    col_map = {
+        "كود الحساب": "account_code",
+        "الكود": "account_code",
+        "account_code": "account_code",
+        "code": "account_code",
+        "مدين": "debit",
+        "رصيد مدين": "debit",
+        "debit": "debit",
+        "دائن": "credit",
+        "رصيد دائن": "credit",
+        "credit": "credit",
+        "التاريخ": "date",
+        "تاريخ الرصيد": "date",
+        "date": "date",
+        "البيان": "description",
+        "description": "description",
+    }
+    renamed = df_upload.rename(
+        columns={c: col_map.get(str(c).strip(), str(c).strip()) for c in df_upload.columns}
+    )
+
+    if "account_code" not in renamed.columns or not (
+        {"debit", "credit"}.issubset(set(renamed.columns))
+    ):
+        return (
+            0,
+            0,
+            [],
+            "الملف يجب أن يحتوي على الأعمدة: account_code (أو كود الحساب)، debit (أو مدين)، credit (أو دائن).",
+        )
+
+    added = 0
+    skipped = 0
+    errors = []
+
+    with engine.begin() as conn:
+        acc_rows = conn.execute(
+            text("SELECT id, code, name, allow_posting FROM accounts WHERE code IS NOT NULL")
+        ).fetchall()
+        acc_lookup = {
+            str(r[1]).strip(): (int(r[0]), str(r[2]), int(r[3])) for r in acc_rows
+        }
+
+        for idx, r in renamed.iterrows():
+            row_num = int(idx) + 2
+            raw_code = r.get("account_code")
+            if pd.isna(raw_code) or not str(raw_code).strip():
+                skipped += 1
+                continue
+
+            acc_code = str(raw_code).strip()
+            if acc_code not in acc_lookup:
+                skipped += 1
+                errors.append(f"الصف {row_num}: كود الحساب '{acc_code}' غير موجود.")
+                continue
+
+            acc_id, acc_name, allow_post = acc_lookup[acc_code]
+            if allow_post == 0:
+                skipped += 1
+                errors.append(
+                    f"الصف {row_num}: الحساب '{acc_code} - {acc_name}' ممنوع التسجيل (رئيسي)."
+                )
+                continue
+
+            try:
+                deb_val = float(r.get("debit")) if pd.notna(r.get("debit")) else 0.0
+            except Exception:
+                deb_val = 0.0
+            try:
+                cred_val = float(r.get("credit")) if pd.notna(r.get("credit")) else 0.0
+            except Exception:
+                cred_val = 0.0
+
+            if deb_val < 0 or cred_val < 0 or (deb_val == 0 and cred_val == 0):
+                skipped += 1
+                errors.append(
+                    f"الصف {row_num}: قيمة المدين أو الدائن غير صالحة أو تساوي صفراً."
+                )
+                continue
+
+            if deb_val > 0 and cred_val > 0:
+                skipped += 1
+                errors.append(
+                    f"الصف {row_num}: لا يمكن إدخال قيمة مدينة ودائنة معاً في نفس سطر الرصيد الافتتاحي."
+                )
+                continue
+
+            entry_dt_str = str(default_date)
+            if "date" in renamed.columns and pd.notna(r.get("date")):
+                try:
+                    entry_dt_str = str(pd.to_datetime(r.get("date")).date())
+                except Exception:
+                    entry_dt_str = str(default_date)
+
+            desc_val = f"رصيد افتتاحي - {acc_name}"
+            if "description" in renamed.columns and pd.notna(r.get("description")):
+                d_txt = str(r.get("description")).strip()
+                if d_txt:
+                    desc_val = d_txt
+
+            entry_id = conn.execute(
+                text(
+                    "INSERT INTO journal_entries (entry_date, description) VALUES (:d, :desc) RETURNING id"
+                ),
+                {"d": entry_dt_str, "desc": desc_val},
+            ).scalar()
+
+            conn.execute(
+                text(
+                    "INSERT INTO journal_details (entry_id, account_id, debit, credit) VALUES (:eid, :aid, :deb, :cred)"
+                ),
+                {
+                    "eid": entry_id,
+                    "aid": acc_id,
+                    "deb": deb_val if deb_val > 0 else 0.0,
+                    "cred": cred_val if cred_val > 0 else 0.0,
+                },
+            )
+            added += 1
+
+    return added, skipped, errors, None
+
+
+def import_projects_and_units_from_df(df_upload: pd.DataFrame):
+    """إضافة المشاريع ووحداتها دفعة واحدة من ملف Excel أو CSV"""
+    col_map = {
+        "كود المشروع": "project_code",
+        "project_code": "project_code",
+        "اسم المشروع": "project_name",
+        "المشروع": "project_name",
+        "project_name": "project_name",
+        "رقم البرج": "tower_no",
+        "البرج": "tower_no",
+        "tower_no": "tower_no",
+        "نوع المشروع": "project_type",
+        "project_type": "project_type",
+        "كود الوحدة": "unit_code",
+        "رقم الوحدة": "unit_code",
+        "unit_code": "unit_code",
+        "المساحة": "area",
+        "المساحة (م²)": "area",
+        "area": "area",
+        "سعر المتر": "price_per_meter",
+        "price_per_meter": "price_per_meter",
+        "السعر الإجمالي": "total_price",
+        "سعر الوحدة الكامل": "total_price",
+        "total_price": "total_price",
+        "الحالة": "status",
+        "حالة الوحدة": "status",
+        "status": "status",
+        "العميل": "customer_name",
+        "اسم العميل": "customer_name",
+        "customer_name": "customer_name",
+    }
+    renamed = df_upload.rename(
+        columns={c: col_map.get(str(c).strip(), str(c).strip()) for c in df_upload.columns}
+    )
+
+    if "project_name" not in renamed.columns:
+        return (
+            0,
+            0,
+            0,
+            [],
+            "الملف يجب أن يحتوي على عمود project_name (أو اسم المشروع) على الأقل.",
+        )
+
+    projects_added = 0
+    units_added = 0
+    units_skipped = 0
+    errors = []
+    valid_statuses = ["متاحة للبيع", "محجوزة", "مباعة"]
+    valid_proj_types = ["سكني", "تجاري", "إداري", "سكني تجاري"]
+
+    with engine.begin() as conn:
+        existing_projs = conn.execute(text("SELECT name FROM projects")).fetchall()
+        proj_names_set = {str(r[0]).strip() for r in existing_projs if r[0]}
+
+        existing_units = conn.execute(text("SELECT unit_code FROM units")).fetchall()
+        unit_codes_set = {str(r[0]).strip() for r in existing_units if r[0]}
+
+        for idx, r in renamed.iterrows():
+            row_num = int(idx) + 2
+            raw_pname = r.get("project_name")
+            if pd.isna(raw_pname) or not str(raw_pname).strip():
+                units_skipped += 1
+                errors.append(f"الصف {row_num}: اسم المشروع مفقود.")
+                continue
+
+            p_name = str(raw_pname).strip()
+            p_code = (
+                str(r.get("project_code")).strip()
+                if "project_code" in renamed.columns and pd.notna(r.get("project_code"))
+                else ""
+            )
+            t_no = (
+                str(r.get("tower_no")).strip()
+                if "tower_no" in renamed.columns and pd.notna(r.get("tower_no"))
+                else ""
+            )
+            p_type = (
+                str(r.get("project_type")).strip()
+                if "project_type" in renamed.columns and pd.notna(r.get("project_type"))
+                else "سكني"
+            )
+            if p_type not in valid_proj_types:
+                p_type = "سكني"
+
+            if p_name not in proj_names_set:
+                try:
+                    conn.execute(
+                        text("""
+                            INSERT INTO projects (project_code, name, tower_no, project_type)
+                            VALUES (:c, :n, :t, :tp)
+                        """),
+                        {"c": p_code, "n": p_name, "t": t_no, "tp": p_type},
+                    )
+                    proj_names_set.add(p_name)
+                    projects_added += 1
+                except Exception as e:
+                    errors.append(f"الصف {row_num}: تعذر إضافة المشروع '{p_name}' ({e}).")
+
+            # إضافة بيانات الوحدة إن وُجد كود وحدة في الصف
+            has_unit_col = "unit_code" in renamed.columns and pd.notna(r.get("unit_code"))
+            if has_unit_col and str(r.get("unit_code")).strip():
+                u_code = str(r.get("unit_code")).strip()
+                if u_code in unit_codes_set:
+                    units_skipped += 1
+                    errors.append(
+                        f"الصف {row_num}: كود الوحدة '{u_code}' مسجل مسبقاً وتم تخطيه."
+                    )
+                    continue
+
+                try:
+                    u_area = (
+                        float(r.get("area"))
+                        if "area" in renamed.columns and pd.notna(r.get("area"))
+                        else 0.0
+                    )
+                except Exception:
+                    u_area = 0.0
+
+                try:
+                    u_ppm = (
+                        float(r.get("price_per_meter"))
+                        if "price_per_meter" in renamed.columns
+                        and pd.notna(r.get("price_per_meter"))
+                        else 0.0
+                    )
+                except Exception:
+                    u_ppm = 0.0
+
+                try:
+                    u_tot = (
+                        float(r.get("total_price"))
+                        if "total_price" in renamed.columns
+                        and pd.notna(r.get("total_price"))
+                        else 0.0
+                    )
+                except Exception:
+                    u_tot = 0.0
+
+                if u_tot <= 0 and u_area > 0 and u_ppm > 0:
+                    u_tot = u_area * u_ppm
+
+                u_status = (
+                    str(r.get("status")).strip()
+                    if "status" in renamed.columns and pd.notna(r.get("status"))
+                    else "متاحة للبيع"
+                )
+                if u_status not in valid_statuses:
+                    u_status = "متاحة للبيع"
+
+                u_cust = (
+                    str(r.get("customer_name")).strip()
+                    if "customer_name" in renamed.columns
+                    and pd.notna(r.get("customer_name"))
+                    else ""
+                )
+
+                conn.execute(
+                    text("""
+                        INSERT INTO units (project_name, unit_code, area, price_per_meter, total_price, status, customer_name)
+                        VALUES (:p, :uc, :ar, :ppm, :tp, :st, :cn)
+                    """),
+                    {
+                        "p": p_name,
+                        "uc": u_code,
+                        "ar": u_area,
+                        "ppm": u_ppm,
+                        "tp": u_tot,
+                        "st": u_status,
+                        "cn": u_cust,
+                    },
+                )
+                unit_codes_set.add(u_code)
+                units_added += 1
+
+    return projects_added, units_added, units_skipped, errors, None
+
+
 def generate_entry_html(
     entry_id, entry_date, description, debit_acc, credit_acc, amount
 ):
@@ -848,6 +1151,73 @@ else:
             engine,
         )
 
+        with st.expander("📥 استيراد الأرصدة الافتتاحية من ملف Excel / CSV"):
+            st.caption(
+                "الأعمدة المطلوبة: `account_code` (أو كود الحساب)، `debit` (أو مدين)، `credit` (أو دائن). اختياري: `date` (أو التاريخ)، `description` (أو البيان)."
+            )
+            ob_template_df = pd.DataFrame(
+                [
+                    {
+                        "account_code": "111",
+                        "debit": 50000.0,
+                        "credit": 0.0,
+                        "date": "2026-01-01",
+                        "description": "رصيد افتتاحي - الصندوق / الخزينة",
+                    },
+                    {
+                        "account_code": "31",
+                        "debit": 0.0,
+                        "credit": 50000.0,
+                        "date": "2026-01-01",
+                        "description": "رصيد افتتاحي - رأس المال",
+                    },
+                ]
+            )
+            st.download_button(
+                label="📄 تحميل نموذج Excel للأرصدة الافتتاحية",
+                data=to_excel(ob_template_df),
+                file_name="opening_balances_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_ob_tpl",
+            )
+            ob_default_dt = st.date_input(
+                "التاريخ الافتراضي للرصيد (إذا لم يُذكر في الملف)",
+                value=date(2026, 1, 1),
+                key="ob_import_default_date",
+            )
+            uploaded_ob = st.file_uploader(
+                "اختر ملف الأرصدة الافتتاحية (.xlsx, .xls, .csv)",
+                type=["xlsx", "xls", "csv"],
+                key="ob_upload",
+            )
+            if uploaded_ob is not None:
+                try:
+                    if uploaded_ob.name.lower().endswith(".csv"):
+                        ob_up_df = pd.read_csv(uploaded_ob)
+                    else:
+                        ob_up_df = pd.read_excel(uploaded_ob)
+                    st.dataframe(ob_up_df.head(15), use_container_width=True)
+                    if st.button(
+                        "🚀 تنفيذ استيراد الأرصدة الافتتاحية",
+                        type="primary",
+                        key="btn_import_ob",
+                    ):
+                        add_c, skip_c, err_list, fatal_err = import_opening_balances_from_df(
+                            ob_up_df, ob_default_dt
+                        )
+                        if fatal_err:
+                            st.error(f"❌ {fatal_err}")
+                        else:
+                            st.success(
+                                f"✅ تم استيراد {add_c} رصيد افتتاحي، وتم تخطي {skip_c} صف."
+                            )
+                            if err_list:
+                                st.warning("ملاحظات الصفوف المتخطاة:\n- " + "\n- ".join(err_list[:20]))
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"❌ تعذر قراءة الملف: {str(e)}")
+
+        st.markdown("---")
         if acc_list.empty:
             st.warning("⚠️ يرجى إنشاء شجرة الحسابات أولاً.")
         else:
@@ -1419,6 +1789,82 @@ else:
         ])
 
         with proj_sub1:
+            with st.expander(
+                "📥 استيراد مشاريع مع وحداتها دفعة واحدة من ملف Excel / CSV"
+            ):
+                st.caption(
+                    "يمكنك رفع ملف يحتوي على بيانات المشروع ووحداته معاً في صفوف متعددة: الأعمدة الأساسية `project_name` (أو اسم المشروع)، `project_code` (أو كود المشروع)، `tower_no`، `project_type`، وبيانات الوحدة `unit_code` (أو كود الوحدة)، `area`، `price_per_meter`، `total_price`، `status`، `customer_name`."
+                )
+                proj_units_tpl_df = pd.DataFrame(
+                    [
+                        {
+                            "project_code": "PRJ-02",
+                            "project_name": "كمبوند النرجس",
+                            "tower_no": "برج B1",
+                            "project_type": "سكني",
+                            "unit_code": "B1-101",
+                            "area": 120.0,
+                            "price_per_meter": 12000.0,
+                            "total_price": 1440000.0,
+                            "status": "متاحة للبيع",
+                            "customer_name": "",
+                        },
+                        {
+                            "project_code": "PRJ-02",
+                            "project_name": "كمبوند النرجس",
+                            "tower_no": "برج B1",
+                            "project_type": "سكني",
+                            "unit_code": "B1-102",
+                            "area": 140.0,
+                            "price_per_meter": 12000.0,
+                            "total_price": 1680000.0,
+                            "status": "محجوزة",
+                            "customer_name": "أحمد محمود",
+                        },
+                    ]
+                )
+                st.download_button(
+                    label="📄 تحميل نموذج Excel للمشاريع والوحدات",
+                    data=to_excel(proj_units_tpl_df),
+                    file_name="projects_and_units_template.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_proj_units_tpl",
+                )
+                uploaded_pu = st.file_uploader(
+                    "اختر ملف المشاريع والوحدات (.xlsx, .xls, .csv)",
+                    type=["xlsx", "xls", "csv"],
+                    key="proj_units_upload",
+                )
+                if uploaded_pu is not None:
+                    try:
+                        if uploaded_pu.name.lower().endswith(".csv"):
+                            pu_df = pd.read_csv(uploaded_pu)
+                        else:
+                            pu_df = pd.read_excel(uploaded_pu)
+                        st.dataframe(pu_df.head(15), use_container_width=True)
+                        if st.button(
+                            "🚀 تنفيذ استيراد المشاريع والوحدات",
+                            type="primary",
+                            key="btn_import_pu",
+                        ):
+                            p_add, u_add, u_skip, u_errs, pu_fatal = (
+                                import_projects_and_units_from_df(pu_df)
+                            )
+                            if pu_fatal:
+                                st.error(f"❌ {pu_fatal}")
+                            else:
+                                st.success(
+                                    f"✅ تم إضافة {p_add} مشروع جديد و {u_add} وحدة جديدة (تم تخطي {u_skip} صف)."
+                                )
+                                if u_errs:
+                                    st.warning(
+                                        "ملاحظات:\n- " + "\n- ".join(u_errs[:20])
+                                    )
+                                st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ تعذر قراءة الملف: {str(e)}")
+
+            st.markdown("---")
             col_pr1, col_pr2 = st.columns([1, 2])
             with col_pr1:
                 st.markdown("#### ➕ إضافة مشروع جديد")
