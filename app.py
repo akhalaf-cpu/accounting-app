@@ -2294,11 +2294,11 @@ if not all_inst_del_df.empty:
                       text("DELETE FROM installments WHERE id = :id"),
                       {"id": inst_id},
                   )
-              st.success(f"✅ تم حذف {len(selected_ids)} قسط بنجاح!")
-              st.rerun()
+                st.success(f"✅ تم حذف {len(selected_ids)} قسط بنجاح!")
+                st.rerun()
 else:
-          st.info("لا توجد أقساط مسجلة حالياً للحذف.")
-        # --- 11. إدارة المستخدمين ---
+            st.info("لا توجد أقساط مسجلة حالياً للحذف.")
+    # --- 11. إدارة المستخدمين ---
     if is_admin:
         with tabs[10]:
             col_u_add, col_u_edit = st.columns(2)
