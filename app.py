@@ -306,7 +306,7 @@ else:
         tabs_list.append("🤖 الـ AI وتحديث الكود")
     tabs = st.tabs(tabs_list)
     # --- 1. شجرة الحسابات ---
-    with tabs[0]:
+    with tabs[1]:
         st.subheader("🌳 إدارة وتأسيس شجرة الحسابات")
         if st.button("⚡ انشاء شجرة حسابات قياسية كاملاً", type="primary"):
             load_default_accounts()
@@ -409,7 +409,7 @@ else:
             st.dataframe(df_acc, use_container_width=True)
 
     # --- 2. الأرصدة الافتتاحية ---
-    with tabs[1]:
+    with tabs[2]:
         st.subheader("🏁 إدخال الأرصدة الافتتاحية")
         acc_list = pd.read_sql("SELECT id, code, name, account_type, allow_posting FROM accounts ORDER BY code ASC", engine)
 
@@ -473,7 +473,7 @@ else:
                 st.dataframe(ob_df, use_container_width=True)
 
     # --- 3. إضافة قيد يومي ---
-    with tabs[2]:
+    with tabs[3]:
         st.subheader("📝 تسجيل قيد محاسبي جديد")
         acc_list = pd.read_sql("SELECT id, code, name, allow_posting FROM accounts ORDER BY code ASC", engine)
         
@@ -533,7 +533,7 @@ else:
                     st.rerun()
 
     # --- 4. دفتر اليومية والطباعة والحذف ---
-    with tabs[3]:
+    with tabs[4]:
         st.subheader("📖 دفتر اليومية وتصدير السندات")
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -598,7 +598,7 @@ else:
                     st.warning("🔒 إلغاء القيود متاح فقط لـ 'مدير النظام'.")
 
     # --- 5. ميزان المراجعة ---
-    with tabs[4]:
+    with tabs[5]:
         st.subheader("⚖️ ميزان المراجعة")
         col_tb1, col_tb2 = st.columns(2)
         with col_tb1:
@@ -639,7 +639,7 @@ else:
             st.download_button(label="📥 تصدير ميزان المراجعة إلى Excel", data=excel_tb, file_name="trial_balance.csv", mime="text/csv")
 
     # --- 6. كشف حساب ---
-    with tabs[5]:
+    with tabs[6]:
         st.subheader("📑 كشف حساب تفصيلي")
         acc_df = pd.read_sql("SELECT id, code, name FROM accounts ORDER BY code ASC", engine)
 
@@ -677,7 +677,7 @@ else:
                     st.download_button(label="📥 تصدير كشف الحساب", data=excel_ledger, file_name=f"ledger_{selected_account}.csv", mime="text/csv")
 
     # --- 7. قائمة الدخل ---
-    with tabs[6]:
+    with tabs[7]:
         st.subheader("📈 قائمة الدخل (الإيرادات والمصروفات)")
         col_inc1, col_inc2 = st.columns(2)
         with col_inc1:
@@ -723,7 +723,7 @@ else:
             c3.metric("صافي الدخل", f"{net_profit:,.2f}", delta=f"{net_profit:,.2f}")
 
     # --- 8. الميزانية العمومية ---
-    with tabs[7]:
+    with tabs[8]:
         st.subheader("🏛️ الميزانية العمومية (قائمة المركز المالي)")
         bs_date = st.date_input("الميزانية في تاريخ:", value=date.today(), key="bs_date")
 
@@ -789,7 +789,7 @@ else:
             diff = total_assets - total_liab_eq
             st.error(f"❌ الفرق: {diff:,.2f}")
 # --- 9. المشاريع والوحدات العقارية ---
-    with tabs[8]:
+    with tabs[9]:
         st.subheader("🏗️ إدارة المشاريع العقارية والوحدات")
         proj_sub1, proj_sub2, proj_sub3 = st.tabs(["🏢 بيانات المشاريع والأبراج", "🏠 وحدات المشروع والأسعار", "📊 تقرير أرباح وتكاليف المشروع"])
 
@@ -895,8 +895,8 @@ else:
                 c_p2.metric("مصروفات وتكاليف المشروع", f"{tot_exp:,.2f}")
                 c_p3.metric("صافي ربح المشروع", f"{(tot_rev - tot_exp):,.2f}")
                 st.dataframe(proj_details_df, use_container_width=True, hide_index=True)
-                # --- 9. نظام أقساط العملاء ---
-    with tabs[9]:
+                # --- 10. نظام أقساط العملاء ---
+    with tabs[10]:
         st.subheader("📅 إدارة ومتابعة أقساط العملاء")
 
         with st.expander("➕ إنشاء خطة أقساط جديدة لعقد عميل", expanded=False):
@@ -1065,9 +1065,9 @@ else:
                     file_name=f"statement_{chosen_cust}.csv",
                     mime="text/csv"
                 )
-    # --- 10. إدارة المستخدمين ---
+    # --- 11. إدارة المستخدمين ---
 if st.session_state['user_role'] == "مدير النظام":
-        with tabs[10]:
+        with tabs[11]:
             col_u_add, col_u_edit = st.columns(2)
             with col_u_add:
                 st.subheader("➕ إضافة مستخدم جديد")
@@ -1117,8 +1117,8 @@ st.markdown("---")
 users_df = pd.read_sql('SELECT id AS "رقم", username AS "اسم المستخدم", role AS "الصلاحية" FROM users', engine)
 st.dataframe(users_df, use_container_width=True)
 
-    # --- 11. التحديث التلقائي الـ AI ---
-with tabs[11]:
+    # --- 12. التحديث التلقائي الـ AI ---
+with tabs[12]:
         st.subheader("🤖 تعديل وتحديث الكود البرمجي تلقائياً بواسطة AI")
         st.info("ملاحظة: عند التشغيل السحابي، يولد الذكاء الاصطناعي الكود المحدث لتقوم بنسخه وتحديثه في ملفك على GitHub.")
 
