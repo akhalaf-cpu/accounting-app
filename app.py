@@ -2220,8 +2220,8 @@ if not all_inst_df.empty:
 else:
           st.info("لا توجد أقساط مسجلة حالياً للتعديل.")
 
-        st.markdown("---")
-        st.markdown("#### 🗑️ حذف قسط واحد أو عدة أقساط دفعة واحدة")
+st.markdown("---")
+st.markdown("#### 🗑️ حذف قسط واحد أو عدة أقساط دفعة واحدة")
         all_inst_del_df = pd.read_sql(
             """
             SELECT id, project_name, customer_name, unit_code, contract_no,
