@@ -2222,7 +2222,7 @@ else:
 
 st.markdown("---")
 st.markdown("#### 🗑️ حذف قسط واحد أو عدة أقساط دفعة واحدة")
-        all_inst_del_df = pd.read_sql(
+all_inst_del_df = pd.read_sql(
             """
             SELECT id, project_name, customer_name, unit_code, contract_no,
                    installment_type, due_date, amount, paid_amount, status
