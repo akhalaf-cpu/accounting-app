@@ -1625,10 +1625,13 @@ else:
                         proj_details_df["نوع الحساب"] == "مصروفات"
                     ]["دائن"].sum()
                 )
-                st.markdown("---")
+st.markdown("---")
 st.markdown("#### ✏️ تعديل أو حذف مشروع محدد")
 all_projs_edit = pd.read_sql(
-    "SELECT id, project_code, name, tower_no, project_type FROM projects WHERE name != 'عام / الإدارة' ORDER BY id ASC",
+    (
+        "SELECT id, project_code, name, tower_no, project_type FROM projects"
+        " WHERE name != 'عام / الإدارة' ORDER BY id ASC"
+    ),
     engine,
 )
 
@@ -1699,19 +1702,22 @@ if not all_projs_edit.empty:
             if old_name != new_name:
               conn.execute(
                   text(
-                      "UPDATE units SET project_name = :nn WHERE project_name = :on"
+                      "UPDATE units SET project_name = :nn WHERE project_name"
+                      " = :on"
                   ),
                   {"nn": new_name, "on": old_name},
               )
               conn.execute(
                   text(
-                      "UPDATE installments SET project_name = :nn WHERE project_name = :on"
+                      "UPDATE installments SET project_name = :nn WHERE"
+                      " project_name = :on"
                   ),
                   {"nn": new_name, "on": old_name},
               )
               conn.execute(
                   text(
-                      "UPDATE journal_entries SET project_name = :nn WHERE project_name = :on"
+                      "UPDATE journal_entries SET project_name = :nn WHERE"
+                      " project_name = :on"
                   ),
                   {"nn": new_name, "on": old_name},
               )
@@ -1764,7 +1770,7 @@ if not all_projs_edit.empty:
         st.rerun()
 else:
   st.info("لا توجد مشاريع إضافية قابلة للتعديل أو الحذف حالياً.")
-  c_p1, c_p2, c_p3 = st.columns(3)
+    c_p1, c_p2, c_p3 = st.columns(3)
   c_p1.metric("إيرادات المشروع", f"{tot_rev:,.2f}")
   c_p2.metric("مصروفات وتكاليف المشروع", f"{tot_exp:,.2f}")
   c_p3.metric("صافي ربح المشروع", f"{(tot_rev - tot_exp):,.2f}")
@@ -2098,122 +2104,135 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 st.markdown("---")
-st.markdown("#### ✏️ تعديل أو حذف قسط محدد")
-if not filtered.empty:
-  inst_edit_options = {
-      (
-          f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
-          f" {r['installment_type']} | استحقاق: {r['due_date']} | قيمة:"
-          f" {float(r['amount']):,.2f}"
-      ): int(r["id"])
-      for _, r in filtered.iterrows()
-  }
-  sel_inst_label = st.selectbox(
-      "اختر القسط للتعديل أو الحذف:",
-      list(inst_edit_options.keys()),
-      key="edit_del_inst_sel",
-  )
-  target_inst_id = inst_edit_options[sel_inst_label]
-  target_inst_row = filtered[filtered["id"] == target_inst_id].iloc[0]
-
-  with st.form("edit_installment_form"):
-    ic1, ic2, ic3, ic4 = st.columns(4)
-    upd_cust = ic1.text_input(
-        "اسم العميل", value=target_inst_row["customer_name"] or ""
-    )
-    upd_unit = ic2.text_input(
-        "كود الوحدة", value=target_inst_row["unit_code"] or ""
-    )
-    upd_contract = ic3.text_input(
-        "رقم العقد", value=target_inst_row["contract_no"] or ""
-    )
-    inst_types = ["Down Payment", "Regular"]
-    curr_type_i = (
-        inst_types.index(target_inst_row["installment_type"])
-        if target_inst_row["installment_type"] in inst_types
-        else 1
-    )
-    upd_inst_type = ic4.selectbox(
-        "نوع القسط", inst_types, index=curr_type_i
+    st.markdown("#### ✏️ تعديل أو حذف قسط محدد")
+    all_inst_df = pd.read_sql(
+        (
+            "SELECT id, customer_name, unit_code, contract_no,"
+            " installment_type, due_date, amount, paid_amount, collector_name"
+            " FROM installments ORDER BY id DESC"
+        ),
+        engine,
     )
 
-    ic5, ic6, ic7, ic8 = st.columns(4)
-    try:
-      parsed_due = date.fromisoformat(str(target_inst_row["due_date"])[:10])
-    except Exception:
-      parsed_due = date.today()
-    upd_due_date = ic5.date_input("تاريخ الاستحقاق", value=parsed_due)
-    upd_amount = ic6.number_input(
-        "قيمة القسط",
-        min_value=0.0,
-        value=float(target_inst_row["amount"] or 0.0),
-        step=500.0,
-    )
-    upd_paid = ic7.number_input(
-        "المبلغ المسدد",
-        min_value=0.0,
-        value=float(target_inst_row["paid_amount"] or 0.0),
-        step=500.0,
-    )
-    upd_collector = ic8.text_input(
-        "مسؤول التحصيل", value=target_inst_row["collector_name"] or ""
-    )
+    if not all_inst_df.empty:
+      inst_edit_options = {
+          (
+              f"#{int(r['id'])} | {r['customer_name']} | {r['unit_code']} |"
+              f" {r['installment_type']} | استحقاق: {r['due_date']} | قيمة:"
+              f" {float(r['amount'] or 0):,.2f}"
+          ): int(r["id"])
+          for _, r in all_inst_df.iterrows()
+      }
+      sel_inst_label = st.selectbox(
+          "اختر القسط للتعديل أو الحذف:",
+          list(inst_edit_options.keys()),
+          key="edit_del_inst_sel",
+      )
+      target_inst_id = inst_edit_options[sel_inst_label]
+      target_inst_row = all_inst_df[all_inst_df["id"] == target_inst_id].iloc[
+          0
+      ]
 
-    col_iu, col_id = st.columns(2)
-    save_inst_btn = col_iu.form_submit_button(
-        "💾 حفظ تعديل القسط", type="primary"
-    )
-    del_inst_btn = col_id.form_submit_button("🗑️ حذف هذا القسط")
-
-    if save_inst_btn:
-      if not upd_cust.strip() or not upd_unit.strip():
-        st.error("يرجى إدخال اسم العميل وكود الوحدة!")
-      else:
-        calc_status = (
-            "Paid"
-            if upd_paid >= upd_amount - 0.01 and upd_amount > 0
-            else ("Partially Paid" if upd_paid > 0 else "Unpaid")
+      with st.form("edit_installment_form"):
+        ic1, ic2, ic3, ic4 = st.columns(4)
+        upd_cust = ic1.text_input(
+            "اسم العميل", value=target_inst_row["customer_name"] or ""
         )
-        with engine.begin() as conn:
-          conn.execute(
-              text("""
-                                UPDATE installments
-                                SET customer_name = :c,
-                                    unit_code = :u,
-                                    contract_no = :cn,
-                                    installment_type = :it,
-                                    due_date = :dd,
-                                    amount = :amt,
-                                    paid_amount = :pa,
-                                    collector_name = :col,
-                                    status = :st
-                                WHERE id = :id
-                            """),
-              {
-                  "c": upd_cust.strip(),
-                  "u": upd_unit.strip(),
-                  "cn": upd_contract.strip(),
-                  "it": upd_inst_type,
-                  "dd": str(upd_due_date),
-                  "amt": float(upd_amount),
-                  "pa": float(upd_paid),
-                  "col": upd_collector.strip(),
-                  "st": calc_status,
-                  "id": int(target_inst_id),
-              },
-          )
-        st.success(f"✅ تم تحديث القسط رقم #{target_inst_id} بنجاح!")
-        st.rerun()
-
-    if del_inst_btn:
-      with engine.begin() as conn:
-        conn.execute(
-            text("DELETE FROM installments WHERE id = :id"),
-            {"id": int(target_inst_id)},
+        upd_unit = ic2.text_input(
+            "كود الوحدة", value=target_inst_row["unit_code"] or ""
         )
-      st.success(f"✅ تم حذف القسط رقم #{target_inst_id} بنجاح!")
-      st.rerun()
-    # --- 11. إدارة المستخدمين ---
+        upd_contract = ic3.text_input(
+            "رقم العقد", value=target_inst_row["contract_no"] or ""
+        )
+        inst_types = ["Down Payment", "Regular"]
+        curr_type_i = (
+            inst_types.index(target_inst_row["installment_type"])
+            if target_inst_row["installment_type"] in inst_types
+            else 1
+        )
+        upd_inst_type = ic4.selectbox(
+            "نوع القسط", inst_types, index=curr_type_i
+        )
+
+        ic5, ic6, ic7, ic8 = st.columns(4)
+        try:
+          parsed_due = date.fromisoformat(str(target_inst_row["due_date"])[:10])
+        except Exception:
+          parsed_due = date.today()
+        upd_due_date = ic5.date_input("تاريخ الاستحقاق", value=parsed_due)
+        upd_amount = ic6.number_input(
+            "قيمة القسط",
+            min_value=0.0,
+            value=float(target_inst_row["amount"] or 0.0),
+            step=500.0,
+        )
+        upd_paid = ic7.number_input(
+            "المبلغ المسدد",
+            min_value=0.0,
+            value=float(target_inst_row["paid_amount"] or 0.0),
+            step=500.0,
+        )
+        upd_collector = ic8.text_input(
+            "مسؤول التحصيل", value=target_inst_row["collector_name"] or ""
+        )
+
+        col_iu, col_id = st.columns(2)
+        save_inst_btn = col_iu.form_submit_button(
+            "💾 حفظ تعديل القسط", type="primary"
+        )
+        del_inst_btn = col_id.form_submit_button("🗑️ حذف هذا القسط")
+
+        if save_inst_btn:
+          if not upd_cust.strip() or not upd_unit.strip():
+            st.error("يرجى إدخال اسم العميل وكود الوحدة!")
+          else:
+            calc_status = (
+                "Paid"
+                if upd_paid >= upd_amount - 0.01 and upd_amount > 0
+                else ("Partially Paid" if upd_paid > 0 else "Unpaid")
+            )
+            with engine.begin() as conn:
+              conn.execute(
+                  text("""
+                                    UPDATE installments
+                                    SET customer_name = :c,
+                                        unit_code = :u,
+                                        contract_no = :cn,
+                                        installment_type = :it,
+                                        due_date = :dd,
+                                        amount = :amt,
+                                        paid_amount = :pa,
+                                        collector_name = :col,
+                                        status = :st
+                                    WHERE id = :id
+                                """),
+                  {
+                      "c": upd_cust.strip(),
+                      "u": upd_unit.strip(),
+                      "cn": upd_contract.strip(),
+                      "it": upd_inst_type,
+                      "dd": str(upd_due_date),
+                      "amt": float(upd_amount),
+                      "pa": float(upd_paid),
+                      "col": upd_collector.strip(),
+                      "st": calc_status,
+                      "id": int(target_inst_id),
+                  },
+              )
+            st.success(f"✅ تم تحديث القسط رقم #{target_inst_id} بنجاح!")
+            st.rerun()
+
+        if del_inst_btn:
+          with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM installments WHERE id = :id"),
+                {"id": int(target_inst_id)},
+            )
+          st.success(f"✅ تم حذف القسط رقم #{target_inst_id} بنجاح!")
+          st.rerun()
+    else:
+      st.info("لا توجد أقساط مسجلة حالياً.")
+        # --- 11. إدارة المستخدمين ---
     if is_admin:
         with tabs[10]:
             col_u_add, col_u_edit = st.columns(2)
