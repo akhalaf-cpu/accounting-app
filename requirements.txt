@@ -1,5 +1,6 @@
 streamlit
 pandas
-openai
-psycopg[binary]
 sqlalchemy
+psycopg[binary]
+openpyxl
+openai
